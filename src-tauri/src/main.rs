@@ -207,12 +207,10 @@ fn run() {
 
     app.run(|app, event| match event {
         // Cmd+Q, the Dock menu and the tray all arrive here.
-        RunEvent::ExitRequested { api, .. } => {
-            if is_guarded(app) {
-                api.prevent_exit();
-                show_keeping_draft(app);
-                let _ = app.emit("close-attempted", Intent::Quit);
-            }
+        RunEvent::ExitRequested { api, .. } if is_guarded(app) => {
+            api.prevent_exit();
+            show_keeping_draft(app);
+            let _ = app.emit("close-attempted", Intent::Quit);
         }
         #[cfg(target_os = "macos")]
         RunEvent::Reopen { .. } => reveal(app),
