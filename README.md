@@ -1,5 +1,7 @@
 # Jot
 
+[![CI](https://github.com/jsbrittain/jot/actions/workflows/ci.yml/badge.svg)](https://github.com/jsbrittain/jot/actions/workflows/ci.yml)
+
 A small desktop scratchpad for short notes attached to projects. Open it, type a
 few sentences, hit `Cmd/Ctrl+S`, and get back to work.
 
@@ -23,6 +25,16 @@ pnpm test         # Rust unit tests (in-memory SQLite)
 
 If `cargo` is not found, the shell has not picked up a fresh Rust install yet:
 `source "$HOME/.cargo/env"` (or open a new terminal).
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on pushes to `main` and on pull requests:
+
+- **Lint and test** (Ubuntu): `tsc`, `cargo fmt --check`, `cargo clippy -D warnings`
+  and `cargo test`.
+- **Build** (macOS, Ubuntu, Windows): `tauri build --no-bundle`. This is mostly to
+  compile the platform-specific paths — the tray icon is Windows/Linux-only and the
+  window handling differs on macOS — which a single-OS local build never checks.
 
 TypeScript is compiled by `tsc`; there is no bundler and no dev server. `pnpm dev`
 compiles once at startup, so run `pnpm watch` in a second terminal while editing
