@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "rootDir": "ui/ts",
+    "outDir": "ui/js",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noEmitOnError": true,
+    "skipLibCheck": true,
+    "sourceMap": true
+  },
+  "include": ["ui/ts/**/*.ts"]
+}

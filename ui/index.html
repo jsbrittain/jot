@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quick Note</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="capture">
+      <header class="project-row">
+        <label for="project">Project</label>
+        <div class="picker">
+          <select id="project" aria-label="Project"></select>
+          <button
+            id="add-project"
+            class="icon"
+            type="button"
+            title="New project"
+            aria-label="New project"
+          >
+            +
+          </button>
+          <input
+            id="new-project-name"
+            type="text"
+            placeholder="New project — Enter to add"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="New project name"
+            maxlength="100"
+            hidden
+          />
+        </div>
+      </header>
+
+      <textarea
+        id="editor"
+        class="editor"
+        placeholder="What happened?"
+        spellcheck="false"
+        aria-label="Note"
+      ></textarea>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <footer class="actions">
+        <span id="hint" class="hint"></span>
+        <button id="browse" class="ghost" type="button" title="Browse notes">Browse</button>
+        <button id="save" class="primary" type="button" disabled>Save</button>
+      </footer>
+
+      <div id="discard" class="discard" role="alertdialog" aria-label="Unsaved note" hidden>
+        <span class="discard-text">Unsaved note</span>
+        <button id="discard-no" class="ghost" type="button">Keep editing</button>
+        <button id="discard-yes" class="danger" type="button">Discard</button>
+      </div>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

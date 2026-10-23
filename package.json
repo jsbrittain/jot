@@ -1,0 +1,17 @@
+{
+  "name": "jot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:ui": "tsc",
+    "watch": "tsc --watch",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "typescript": "^5.6"
+  }
+}

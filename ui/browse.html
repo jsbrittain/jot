@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Notes</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="browse-body">
+    <main class="browse">
+      <header class="browse-bar">
+        <label for="filter">Project</label>
+        <select id="filter" aria-label="Filter by project"></select>
+        <button
+          id="remove-project"
+          class="icon"
+          type="button"
+          title="Delete project"
+          aria-label="Delete project"
+          disabled
+        >
+          −
+        </button>
+        <input
+          id="search"
+          type="search"
+          class="search"
+          placeholder="Search notes"
+          aria-label="Search notes"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </header>
+
+      <div class="browse-panes">
+        <ul id="list" class="note-list" role="listbox" aria-label="Notes"></ul>
+
+        <section class="note-pane">
+          <p id="meta" class="note-meta"></p>
+          <textarea
+            id="content"
+            class="editor"
+            spellcheck="false"
+            aria-label="Note content"
+            disabled
+          ></textarea>
+          <div class="note-actions">
+            <p id="status" class="status" role="status" aria-live="polite"></p>
+            <button id="delete" class="danger" type="button" disabled>Delete</button>
+            <button id="save" class="primary" type="button" disabled>Save</button>
+          </div>
+        </section>
+      </div>
+
+      <div id="confirm" class="discard" role="alertdialog" aria-label="Confirm delete" hidden>
+        <span id="confirm-text" class="discard-text"></span>
+        <button id="confirm-no" class="ghost" type="button">Cancel</button>
+        <button id="confirm-yes" class="danger" type="button">Delete</button>
+      </div>
+
+      <div id="guard" class="discard" role="alertdialog" aria-label="Unsaved changes" hidden>
+        <span class="discard-text">Unsaved changes</span>
+        <button id="guard-no" class="ghost" type="button">Keep editing</button>
+        <button id="guard-yes" class="danger" type="button">Discard</button>
+      </div>
+    </main>
+
+    <script type="module" src="js/browse.js"></script>
+  </body>
+</html>
