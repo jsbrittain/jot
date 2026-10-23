@@ -141,12 +141,16 @@ pub fn create_project(conn: &Connection, name: &str) -> Result<Project> {
     )?;
     // NOCASE on the column means this matches an existing project even when the
     // casing differs, so "RQA" and "rqa" resolve to the same row.
-    conn.query_row("SELECT id, name FROM projects WHERE name = ?1", [name], |r| {
-        Ok(Project {
-            id: r.get(0)?,
-            name: r.get(1)?,
-        })
-    })
+    conn.query_row(
+        "SELECT id, name FROM projects WHERE name = ?1",
+        [name],
+        |r| {
+            Ok(Project {
+                id: r.get(0)?,
+                name: r.get(1)?,
+            })
+        },
+    )
 }
 
 pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
@@ -365,7 +369,10 @@ mod tests {
 
         delete_note(&conn, id).unwrap();
         assert!(list_notes(&conn, None, None).unwrap().is_empty());
-        assert!(delete_note(&conn, id).is_err(), "second delete is a no-op error");
+        assert!(
+            delete_note(&conn, id).is_err(),
+            "second delete is a no-op error"
+        );
     }
 
     #[test]
@@ -441,9 +448,7 @@ mod tests {
         );
 
         assert!(
-            list_notes(&conn, None, Some("%"))
-                .unwrap()
-                .is_empty(),
+            list_notes(&conn, None, Some("%")).unwrap().is_empty(),
             "wildcards are matched literally"
         );
 

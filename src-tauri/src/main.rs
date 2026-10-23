@@ -115,8 +115,7 @@ fn register_global_shortcut(app: &AppHandle) -> tauri::Result<()> {
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(move |app, triggered, event| {
-                if event.state == ShortcutState::Pressed
-                    && triggered.matches(modifiers, Code::KeyJ)
+                if event.state == ShortcutState::Pressed && triggered.matches(modifiers, Code::KeyJ)
                 {
                     reveal(app);
                 }
@@ -137,7 +136,8 @@ fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             reveal(app)
         }))
-        .setup(move |app| {            let data_dir = app.path().app_data_dir()?;
+        .setup(move |app| {
+            let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             let db_path = data_dir.join("jot.db");
             let conn = db::open(&db_path)?;
