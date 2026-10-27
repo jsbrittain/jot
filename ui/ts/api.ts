@@ -58,6 +58,8 @@ export const api = {
     tauri().core.invoke<Note[]>("list_notes", { projectId, query }),
   countNotes: (projectId: number | null) =>
     tauri().core.invoke<number>("count_notes", { projectId }),
+  moveNote: (id: number, projectId: number) =>
+    tauri().core.invoke<Note>("move_note", { id, projectId }),
   updateNote: (id: number, content: string) =>
     tauri().core.invoke<Note>("update_note", { id, content }),
   deleteNote: (id: number) => tauri().core.invoke<void>("delete_note", { id }),

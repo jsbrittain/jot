@@ -11,6 +11,17 @@
       <header class="browse-bar">
         <label for="filter">Project</label>
         <select id="filter" aria-label="Filter by project"></select>
+        <input
+          id="new-project-name"
+          type="text"
+          class="new-project"
+          placeholder="New project — Enter to add"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="New project name"
+          maxlength="100"
+          hidden
+        />
         <button
           id="remove-project"
           class="icon"
@@ -20,6 +31,15 @@
           disabled
         >
           −
+        </button>
+        <button
+          id="add-project"
+          class="icon"
+          type="button"
+          title="New project"
+          aria-label="New project"
+        >
+          +
         </button>
         <input
           id="search"
@@ -36,7 +56,10 @@
         <ul id="list" class="note-list" role="listbox" aria-label="Notes"></ul>
 
         <section class="note-pane">
-          <p id="meta" class="note-meta"></p>
+          <div class="note-header">
+            <select id="note-project" aria-label="Note project" disabled></select>
+            <p id="meta" class="note-meta"></p>
+          </div>
           <textarea
             id="content"
             class="editor"

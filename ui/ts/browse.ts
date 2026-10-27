@@ -15,6 +15,9 @@ const els = {
   filter: el<HTMLSelectElement>("#filter"),
   search: el<HTMLInputElement>("#search"),
   removeProject: el<HTMLButtonElement>("#remove-project"),
+  addProject: el<HTMLButtonElement>("#add-project"),
+  newProject: el<HTMLInputElement>("#new-project-name"),
+  noteProject: el<HTMLSelectElement>("#note-project"),
   list: el<HTMLUListElement>("#list"),
   meta: el<HTMLParagraphElement>("#meta"),
   content: el<HTMLTextAreaElement>("#content"),
@@ -37,6 +40,7 @@ let filterProjectId: number | null = null;
 let appliedQuery = "";
 let editing = false;
 let busy = false;
+let creatingProject = false;
 let statusTimer: number | undefined;
 let confirmAction: (() => Promise<void>) | null = null;
 
@@ -122,6 +126,16 @@ function updateRemoveButton(): void {
     !project || project.name.toLowerCase() === "inbox";
 }
 
+function renderNoteProjects(selected: number | null): void {
+  els.noteProject.replaceChildren(
+    ...projects.map((project) => new Option(project.name, String(project.id))),
+  );
+  if (selected !== null && projects.some((project) => project.id === selected)) {
+    els.noteProject.value = String(selected);
+  }
+  els.noteProject.disabled = selected === null;
+}
+
 function renderList(): void {
   if (notes.length === 0) {
     const empty = document.createElement("li");
@@ -195,6 +209,7 @@ function select(id: number | null, focusContent = false): void {
   els.content.disabled = note === null;
   els.meta.textContent = note ? metaText(note) : "";
   els.delete.disabled = note === null;
+  renderNoteProjects(note?.projectId ?? null);
   els.save.disabled = true;
   setEditing(false);
   paintSelection();
@@ -208,6 +223,7 @@ async function loadProjects(): Promise<void> {
   projects = data.projects;
   renderFilter();
   updateRemoveButton();
+  renderNoteProjects(current()?.projectId ?? null);
 }
 
 async function load(keepSelection = false): Promise<void> {
@@ -353,6 +369,67 @@ async function deleteProject(): Promise<void> {
   }
 }
 
+async function moveNote(): Promise<void> {
+  const note = current();
+  if (!note) return;
+  const target = Number(els.noteProject.value);
+  if (!Number.isFinite(target) || target === note.projectId) return;
+  if (editing) {
+    els.noteProject.value = String(note.projectId);
+    showStatus("Save or press Esc before moving");
+    return;
+  }
+  try {
+    const moved = await api.moveNote(note.id, target);
+    notes = notes.map((candidate) =>
+      candidate.id === moved.id ? moved : candidate,
+    );
+    els.noteProject.value = String(moved.projectId);
+    await load(true);
+    showStatus(`Moved to ${moved.projectName}`);
+  } catch (error) {
+    els.noteProject.value = String(note.projectId);
+    showError(error);
+  }
+}
+
+function openNewProject(): void {
+  creatingProject = true;
+  els.filter.hidden = true;
+  els.removeProject.hidden = true;
+  els.addProject.hidden = true;
+  els.newProject.hidden = false;
+  els.newProject.value = "";
+  els.newProject.focus();
+}
+
+function closeNewProject(): void {
+  if (!creatingProject) return;
+  creatingProject = false;
+  els.newProject.hidden = true;
+  els.newProject.value = "";
+  els.filter.hidden = false;
+  els.removeProject.hidden = false;
+  els.addProject.hidden = false;
+}
+
+async function commitNewProject(): Promise<void> {
+  const name = els.newProject.value.trim();
+  if (!name) {
+    closeNewProject();
+    return;
+  }
+  try {
+    const project = await api.createProject(name);
+    closeNewProject();
+    await loadProjects();
+    showStatus(`Created "${project.name}"`);
+  } catch (error) {
+    showError(error);
+    els.newProject.focus();
+  }
+}
+
 /* ----------------------------------------------------------------- bindings */
 
 function bindEvents(): void {
@@ -360,6 +437,17 @@ function bindEvents(): void {
   els.save.addEventListener("click", () => void save());
   els.delete.addEventListener("click", askDeleteNote);
   els.removeProject.addEventListener("click", () => void askDeleteProject());
+  els.noteProject.addEventListener("change", () => void moveNote());
+  els.addProject.addEventListener("click", openNewProject);
+  els.newProject.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitNewProject();
+    }
+  });
+  els.newProject.addEventListener("blur", () => {
+    if (creatingProject && !els.newProject.value.trim()) closeNewProject();
+  });
   els.confirmYes.addEventListener("click", () => void runConfirm());
   els.confirmNo.addEventListener("click", () => {
     cancelConfirm();
@@ -428,6 +516,10 @@ function bindEvents(): void {
     }
     if (event.key !== "Escape") return;
     event.preventDefault();
+    if (creatingProject) {
+      closeNewProject();
+      return;
+    }
     if (document.activeElement === els.search && els.search.value !== "") {
       els.search.value = "";
       applySearch();

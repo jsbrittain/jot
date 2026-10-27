@@ -167,6 +167,7 @@ fn run() {
             commands::create_project,
             commands::list_notes,
             commands::count_notes,
+            commands::move_note,
             commands::update_note,
             commands::delete_note,
             commands::delete_project,

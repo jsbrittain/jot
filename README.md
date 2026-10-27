@@ -84,6 +84,10 @@ note on the right.
 - `Cmd/Ctrl+S` saves an edit, `Esc` reverts it, `Esc` again closes the window.
 - `Cmd/Ctrl+W` also closes the window, asking first if an edit is unsaved.
 - `Delete` asks once, then removes the note.
+- The project selector above the note reassigns it. Moving doesn't change the
+  created or edited time — it isn't a content edit.
+- `+` next to the project filter creates a project inline. The filter stays where
+  it is, so the note you are reassigning doesn't vanish from view.
 - `−` next to the project filter deletes a project. Its notes are moved to
   `Inbox`, never discarded, and `Inbox` itself can't be deleted.
 - Created and last-edited times are shown in local time; the stored values are UTC
