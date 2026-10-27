@@ -216,7 +216,6 @@ function createTodoRow(todo: TodoLine, index: number): HTMLLIElement {
   const tick = document.createElement("button");
   tick.type = "button";
   tick.className = "todo-tick";
-  tick.textContent = "✓";
   tick.title = "Mark complete";
   tick.setAttribute("aria-label", "Mark complete");
   tick.tabIndex = -1;

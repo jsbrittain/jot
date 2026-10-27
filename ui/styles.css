@@ -431,25 +431,18 @@ button.danger {
   width: 17px;
   height: 17px;
   padding: 0;
-  font-size: 10px;
-  line-height: 1;
-  color: transparent;
+  cursor: pointer;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1.5px solid var(--muted);
   border-radius: 50%;
 }
 
-.todo-row:hover .todo-tick {
-  color: var(--muted);
-}
-
+.todo-row:hover .todo-tick,
 .todo-tick:hover {
-  color: var(--accent);
   border-color: var(--accent);
 }
 
 .todo-row.is-selected .todo-tick {
-  color: var(--accent-fg);
   border-color: var(--accent-fg);
 }
 
