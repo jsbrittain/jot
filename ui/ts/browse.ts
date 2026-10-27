@@ -15,6 +15,8 @@ const els = {
   filter: el<HTMLSelectElement>("#filter"),
   search: el<HTMLInputElement>("#search"),
   todoOnly: el<HTMLButtonElement>("#todo-only"),
+  panes: el<HTMLDivElement>(".browse-panes"),
+  splitter: el<HTMLDivElement>("#splitter"),
   removeProject: el<HTMLButtonElement>("#remove-project"),
   addProject: el<HTMLButtonElement>("#add-project"),
   newProject: el<HTMLInputElement>("#new-project-name"),
@@ -231,7 +233,11 @@ function createTodoRow(todo: TodoLine, index: number): HTMLLIElement {
   meta.className = "todo-meta";
   meta.textContent = `${todo.projectName} · ${when.format(new Date(todo.createdAt))}`;
 
-  row.append(tick, text, meta);
+  const body = document.createElement("span");
+  body.className = "todo-body";
+  body.append(text, meta);
+
+  row.append(tick, body);
   row.addEventListener("click", () => openTodo(index, true));
   row.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -574,6 +580,100 @@ async function commitNewProject(): Promise<void> {
   }
 }
 
+/* ----------------------------------------------------------------- splitter */
+
+const LIST_WIDTH_KEY = "jot:browse-list-width";
+const LIST_MIN = 180;
+const LIST_DEFAULT = 280;
+
+function listMax(): number {
+  const width = els.panes.clientWidth;
+  if (width === 0) return 720;
+  return Math.max(LIST_MIN, Math.min(720, width - 320));
+}
+
+function setListWidth(width: number, persist = false): void {
+  const clamped = Math.round(Math.min(Math.max(width, LIST_MIN), listMax()));
+  els.panes.style.setProperty("--list-width", `${clamped}px`);
+  if (!persist) return;
+  try {
+    localStorage.setItem(LIST_WIDTH_KEY, String(clamped));
+  } catch {
+    // Storage may be unavailable; the width just won't persist.
+  }
+}
+
+function restoreListWidth(): void {
+  let stored = Number.NaN;
+  try {
+    stored = Number(localStorage.getItem(LIST_WIDTH_KEY));
+  } catch {
+    // Ignore and fall back to the default.
+  }
+  setListWidth(Number.isFinite(stored) && stored > 0 ? stored : LIST_DEFAULT);
+}
+
+function bindSplitter(): void {
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  els.splitter.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    dragging = true;
+    startX = event.clientX;
+    startWidth = els.list.getBoundingClientRect().width;
+    els.splitter.setPointerCapture(event.pointerId);
+    els.splitter.classList.add("is-dragging");
+    document.body.classList.add("is-resizing");
+  });
+
+  els.splitter.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    setListWidth(startWidth + event.clientX - startX);
+  });
+
+  const endDrag = (event: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = false;
+    if (els.splitter.hasPointerCapture(event.pointerId)) {
+      els.splitter.releasePointerCapture(event.pointerId);
+    }
+    els.splitter.classList.remove("is-dragging");
+    document.body.classList.remove("is-resizing");
+    setListWidth(els.list.getBoundingClientRect().width, true);
+  };
+  els.splitter.addEventListener("pointerup", endDrag);
+  els.splitter.addEventListener("pointercancel", endDrag);
+
+  els.splitter.addEventListener("keydown", (event) => {
+    const current = els.list.getBoundingClientRect().width;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setListWidth(current - 16, true);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setListWidth(current + 16, true);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      setListWidth(LIST_MIN, true);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      setListWidth(listMax(), true);
+    }
+  });
+
+  els.splitter.addEventListener("dblclick", () =>
+    setListWidth(LIST_DEFAULT, true),
+  );
+
+  // Re-clamp when the window narrows, so the detail pane never collapses.
+  window.addEventListener("resize", () =>
+    setListWidth(els.list.getBoundingClientRect().width),
+  );
+}
+
 /* ----------------------------------------------------------------- bindings */
 
 function bindEvents(): void {
@@ -710,6 +810,8 @@ async function boot(): Promise<void> {
     showError(error);
   }
   bindEvents();
+  bindSplitter();
+  restoreListWidth();
   await load();
   if (selectedRow >= 0) focusRow(selectedRow);
 }

@@ -255,8 +255,9 @@ button.danger {
 }
 
 .browse-panes {
+  --list-width: 280px;
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr);
+  grid-template-columns: var(--list-width) 7px minmax(0, 1fr);
   gap: 10px;
   flex: 1;
   min-height: 0;
@@ -399,7 +400,7 @@ button.danger {
 
 .todo-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 6px 8px;
   border-radius: 6px;
@@ -426,6 +427,7 @@ button.danger {
 
 .todo-tick {
   flex: none;
+  margin-top: 2px;
   width: 17px;
   height: 17px;
   padding: 0;
@@ -451,12 +453,16 @@ button.danger {
   border-color: var(--accent-fg);
 }
 
-.todo-text {
+.todo-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.todo-text {
+  overflow-wrap: anywhere;
 }
 
 .todo-meta {
@@ -468,4 +474,36 @@ button.danger {
 .todo-row.is-selected .todo-meta {
   color: var(--accent-fg);
   opacity: 0.85;
+}
+
+/* draggable divider between the list and the note pane */
+
+.splitter {
+  position: relative;
+  cursor: col-resize;
+  border-radius: 3px;
+}
+
+.splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: var(--line);
+  border-radius: 1px;
+  transition: background 120ms ease;
+}
+
+.splitter:hover::after,
+.splitter.is-dragging::after,
+.splitter:focus-visible::after {
+  background: var(--accent);
+}
+
+.splitter:focus-visible {
+  outline: none;
+}
+
+body.is-resizing {
+  cursor: col-resize;
+  user-select: none;
 }

@@ -97,6 +97,10 @@ The browse window is created on demand and closed when you are done, so it costs
 nothing at startup. Opening it hides the capture window, unless the capture window
 holds an unsaved draft — hiding that would discard it on the next summon.
 
+The divider between the list and the note can be dragged to widen either side.
+It is focusable, so `←`/`→` move it and `Home`/`End` go to the limits; double-click
+resets it. The width is remembered between sessions.
+
 ### Todos
 
 Write `#todo` anywhere in a line to turn it into an action point. The `#todo`
@@ -109,6 +113,7 @@ button in the toolbar swaps the note list for one row per **open** todo:
 - The round tick marks it complete: `#todo` becomes `#done` in the note, the row
   leaves the list, and the note's edited time moves.
 - Clicking a row opens the note with the caret on that line.
+- Long action points wrap onto multiple lines, with the project and date beneath.
 - Matching is case-insensitive (`#TODO` works) but boundary-aware: `#todos` and
   `#todoist` are not action points.
 
