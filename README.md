@@ -97,6 +97,24 @@ The browse window is created on demand and closed when you are done, so it costs
 nothing at startup. Opening it hides the capture window, unless the capture window
 holds an unsaved draft — hiding that would discard it on the next summon.
 
+### Todos
+
+Write `#todo` anywhere in a line to turn it into an action point. The `#todo`
+button in the toolbar swaps the note list for one row per **open** todo:
+
+- With a project selected you get that project's todos; `All projects` gives all
+  of them. Search filters within the todo lines.
+- Rows show the line with the tag stripped, so `#todo send email` reads as
+  `send email`, alongside its project and date.
+- The round tick marks it complete: `#todo` becomes `#done` in the note, the row
+  leaves the list, and the note's edited time moves.
+- Clicking a row opens the note with the caret on that line.
+- Matching is case-insensitive (`#TODO` works) but boundary-aware: `#todos` and
+  `#todoist` are not action points.
+
+Completed items stay in the note as `#done`; searching for `#done` is the history
+view. No tag tables are involved — the view is derived from the note text.
+
 ## Startup
 
 Launching Jot shows no window. It starts resident and waits to be summoned, so
