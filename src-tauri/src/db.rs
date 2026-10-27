@@ -207,6 +207,26 @@ pub fn count_notes(conn: &Connection, project_id: Option<i64>) -> Result<i64> {
     )
 }
 
+pub fn project_exists(conn: &Connection, id: i64) -> Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM projects WHERE id = ?1)",
+        [id],
+        |row| row.get(0),
+    )
+}
+
+/// Reassign a note without touching its timestamps: moving is not editing.
+pub fn move_note(conn: &Connection, id: i64, project_id: i64) -> Result<Note> {
+    let changed = conn.execute(
+        "UPDATE notes SET project_id = ?2 WHERE id = ?1",
+        params![id, project_id],
+    )?;
+    if changed == 0 {
+        return Err(rusqlite::Error::QueryReturnedNoRows);
+    }
+    conn.query_row(&format!("{NOTE_QUERY} WHERE n.id = ?1"), [id], row_to_note)
+}
+
 /// Replace the content and stamp `updated_at`. `created_at` never changes.
 pub fn update_note(conn: &Connection, id: i64, content: &str) -> Result<Note> {
     let changed = conn.execute(
@@ -459,5 +479,35 @@ mod tests {
         );
         assert_eq!(count_notes(&conn, None).unwrap(), 2);
         assert_eq!(count_notes(&conn, Some(rqa.id)).unwrap(), 1);
+    }
+
+    #[test]
+    fn moving_a_note_changes_project_and_keeps_timestamps() {
+        let mut conn = memory_db();
+        let inbox = inbox_id(&conn).unwrap();
+        let rqa = create_project(&conn, "RQA").unwrap();
+        let id = create_note(&mut conn, inbox, "scoping").unwrap();
+        let before = list_notes(&conn, None, None).unwrap()[0].clone();
+
+        std::thread::sleep(std::time::Duration::from_millis(3));
+        let moved = move_note(&conn, id, rqa.id).unwrap();
+
+        assert_eq!(moved.project_id, rqa.id);
+        assert_eq!(moved.project_name, "RQA");
+        assert_eq!(moved.created_at, before.created_at);
+        assert_eq!(moved.updated_at, before.updated_at, "a move is not an edit");
+        assert!(list_notes(&conn, Some(inbox), None).unwrap().is_empty());
+        assert_eq!(list_notes(&conn, Some(rqa.id), None).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn moving_to_a_missing_project_fails() {
+        let mut conn = memory_db();
+        let inbox = inbox_id(&conn).unwrap();
+        let id = create_note(&mut conn, inbox, "orphan").unwrap();
+
+        assert!(move_note(&conn, id, 9999).is_err());
+        assert!(!project_exists(&conn, 9999).unwrap());
+        assert!(project_exists(&conn, inbox).unwrap());
     }
 }

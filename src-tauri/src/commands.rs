@@ -124,6 +124,15 @@ pub fn count_notes(state: State<'_, AppState>, project_id: Option<i64>) -> Resul
 }
 
 #[tauri::command]
+pub fn move_note(state: State<'_, AppState>, id: i64, project_id: i64) -> Result<Note, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    if !db::project_exists(&conn, project_id).map_err(|e| e.to_string())? {
+        return Err("That project no longer exists".into());
+    }
+    db::move_note(&conn, id, project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn update_note(state: State<'_, AppState>, id: i64, content: String) -> Result<Note, String> {
     let content = db::clean_note(&content).ok_or_else(|| "Note is empty".to_string())?;
     let conn = state.db.lock().map_err(|e| e.to_string())?;
@@ -154,15 +163,20 @@ pub fn open_browser(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("browse") {
         let _ = window.show();
         let _ = window.set_focus();
-        return Ok(());
-    }
-    tauri::WebviewWindowBuilder::new(&app, "browse", tauri::WebviewUrl::App("browse.html".into()))
+    } else {
+        tauri::WebviewWindowBuilder::new(
+            &app,
+            "browse",
+            tauri::WebviewUrl::App("browse.html".into()),
+        )
         .title("Notes")
         .inner_size(900.0, 620.0)
         .min_inner_size(680.0, 440.0)
         .build()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    }
+    crate::hide_capture_if_clean(&app);
+    Ok(())
 }
 
 #[tauri::command]

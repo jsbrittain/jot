@@ -355,3 +355,27 @@ button.danger {
 .note-actions .status {
   margin-right: auto;
 }
+
+/* note detail header: project reassignment alongside timestamps */
+
+.note-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.note-header select {
+  max-width: 220px;
+}
+
+.note-header .note-meta {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browse-bar .new-project {
+  flex: 0 1 220px;
+  max-width: 220px;
+}

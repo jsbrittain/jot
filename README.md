@@ -84,13 +84,18 @@ note on the right.
 - `Cmd/Ctrl+S` saves an edit, `Esc` reverts it, `Esc` again closes the window.
 - `Cmd/Ctrl+W` also closes the window, asking first if an edit is unsaved.
 - `Delete` asks once, then removes the note.
+- The project selector above the note reassigns it. Moving doesn't change the
+  created or edited time — it isn't a content edit.
+- `+` next to the project filter creates a project inline. The filter stays where
+  it is, so the note you are reassigning doesn't vanish from view.
 - `−` next to the project filter deletes a project. Its notes are moved to
   `Inbox`, never discarded, and `Inbox` itself can't be deleted.
 - Created and last-edited times are shown in local time; the stored values are UTC
   and never enter an editable field.
 
 The browse window is created on demand and closed when you are done, so it costs
-nothing at startup.
+nothing at startup. Opening it hides the capture window, unless the capture window
+holds an unsaved draft — hiding that would discard it on the next summon.
 
 ## Startup
 
