@@ -94,7 +94,8 @@ note on the right.
   and never enter an editable field.
 
 The browse window is created on demand and closed when you are done, so it costs
-nothing at startup.
+nothing at startup. Opening it hides the capture window, unless the capture window
+holds an unsaved draft — hiding that would discard it on the next summon.
 
 ## Startup
 

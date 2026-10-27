@@ -57,6 +57,17 @@ pub fn show_keeping_draft(app: &AppHandle) {
     }
 }
 
+/// The browse window replaces the capture window, unless an unsaved draft is at
+/// stake: hiding it would reset the editor on the next summon.
+pub fn hide_capture_if_clean(app: &AppHandle) {
+    if is_guarded(app) {
+        return;
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
 /// Quit deliberately, asking first if there is an unsaved draft.
 #[cfg_attr(target_os = "macos", allow(dead_code))]
 pub fn request_quit(app: &AppHandle) {

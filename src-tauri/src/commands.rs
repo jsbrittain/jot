@@ -163,15 +163,20 @@ pub fn open_browser(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("browse") {
         let _ = window.show();
         let _ = window.set_focus();
-        return Ok(());
-    }
-    tauri::WebviewWindowBuilder::new(&app, "browse", tauri::WebviewUrl::App("browse.html".into()))
+    } else {
+        tauri::WebviewWindowBuilder::new(
+            &app,
+            "browse",
+            tauri::WebviewUrl::App("browse.html".into()),
+        )
         .title("Notes")
         .inner_size(900.0, 620.0)
         .min_inner_size(680.0, 440.0)
         .build()
-        .map(|_| ())
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    }
+    crate::hide_capture_if_clean(&app);
+    Ok(())
 }
 
 #[tauri::command]
