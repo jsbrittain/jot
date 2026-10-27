@@ -1,4 +1,4 @@
-import { api, type Note, type Project } from "./api.js";
+import { api, type Note, type Project, type TodoLine } from "./api.js";
 
 const when = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -14,6 +14,9 @@ function el<T extends HTMLElement>(selector: string): T {
 const els = {
   filter: el<HTMLSelectElement>("#filter"),
   search: el<HTMLInputElement>("#search"),
+  todoOnly: el<HTMLButtonElement>("#todo-only"),
+  panes: el<HTMLDivElement>(".browse-panes"),
+  splitter: el<HTMLDivElement>("#splitter"),
   removeProject: el<HTMLButtonElement>("#remove-project"),
   addProject: el<HTMLButtonElement>("#add-project"),
   newProject: el<HTMLInputElement>("#new-project-name"),
@@ -35,7 +38,10 @@ const els = {
 
 let projects: Project[] = [];
 let notes: Note[] = [];
+let todoLines: TodoLine[] = [];
+let todoOnly = false;
 let selectedId: number | null = null;
+let selectedRow = -1;
 let filterProjectId: number | null = null;
 let appliedQuery = "";
 let editing = false;
@@ -137,6 +143,10 @@ function renderNoteProjects(selected: number | null): void {
 }
 
 function renderList(): void {
+  if (todoOnly) {
+    renderTodoRows();
+    return;
+  }
   if (notes.length === 0) {
     const empty = document.createElement("li");
     empty.className = "note-empty";
@@ -183,19 +193,86 @@ function createRow(note: Note): HTMLLIElement {
   return row;
 }
 
+function renderTodoRows(): void {
+  if (todoLines.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "note-empty";
+    empty.textContent = appliedQuery ? "No matching todos." : "No open todos.";
+    els.list.replaceChildren(empty);
+    return;
+  }
+  els.list.replaceChildren(...todoLines.map(createTodoRow));
+}
+
+function createTodoRow(todo: TodoLine, index: number): HTMLLIElement {
+  const row = document.createElement("li");
+  row.className = "todo-row";
+  row.dataset.index = String(index);
+  row.tabIndex = 0;
+  row.setAttribute("role", "option");
+  row.setAttribute("aria-selected", String(index === selectedRow));
+  if (index === selectedRow) row.classList.add("is-selected");
+
+  const tick = document.createElement("button");
+  tick.type = "button";
+  tick.className = "todo-tick";
+  tick.title = "Mark complete";
+  tick.setAttribute("aria-label", "Mark complete");
+  tick.tabIndex = -1;
+  tick.addEventListener("click", (event) => {
+    event.stopPropagation();
+    void completeTodo(index);
+  });
+
+  const text = document.createElement("span");
+  text.className = "todo-text";
+  text.textContent = todo.text;
+
+  const meta = document.createElement("span");
+  meta.className = "todo-meta";
+  meta.textContent = `${todo.projectName} · ${when.format(new Date(todo.createdAt))}`;
+
+  const body = document.createElement("span");
+  body.className = "todo-body";
+  body.append(text, meta);
+
+  row.append(tick, body);
+  row.addEventListener("click", () => openTodo(index, true));
+  row.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openTodo(index, true);
+    }
+  });
+  return row;
+}
+
 function paintSelection(): void {
-  for (const row of els.list.querySelectorAll<HTMLElement>(".note-row")) {
-    const active = row.dataset.id === String(selectedId);
+  for (const row of els.list.querySelectorAll<HTMLElement>(
+    ".note-row, .todo-row",
+  )) {
+    const active = todoOnly
+      ? Number(row.dataset.index) === selectedRow
+      : row.dataset.id === String(selectedId);
     row.classList.toggle("is-selected", active);
     row.setAttribute("aria-selected", String(active));
   }
 }
 
-function focusRow(id: number | null): void {
-  const row = els.list.querySelector<HTMLElement>(
-    `.note-row[data-id="${String(id)}"]`,
-  );
-  row?.focus();
+function focusRow(position: number): void {
+  const rows = els.list.querySelectorAll<HTMLElement>(".note-row, .todo-row");
+  rows[position]?.focus();
+}
+
+function showNote(note: Note | null, focusContent = false): void {
+  els.content.value = note?.content ?? "";
+  els.content.disabled = note === null;
+  els.meta.textContent = note ? metaText(note) : "";
+  els.delete.disabled = note === null;
+  renderNoteProjects(note?.projectId ?? null);
+  els.save.disabled = true;
+  setEditing(false);
+  if (note && focusContent) els.content.focus();
 }
 
 function select(id: number | null, focusContent = false): void {
@@ -204,16 +281,31 @@ function select(id: number | null, focusContent = false): void {
     return;
   }
   selectedId = id;
-  const note = current();
-  els.content.value = note?.content ?? "";
-  els.content.disabled = note === null;
-  els.meta.textContent = note ? metaText(note) : "";
-  els.delete.disabled = note === null;
-  renderNoteProjects(note?.projectId ?? null);
-  els.save.disabled = true;
-  setEditing(false);
+  selectedRow = notes.findIndex((note) => note.id === id);
+  showNote(current(), focusContent);
   paintSelection();
-  if (note && focusContent) els.content.focus();
+}
+
+function openTodo(index: number, focusContent = false): void {
+  const todo = todoLines[index];
+  if (!todo) return;
+  if (editing) {
+    showStatus("Save or press Esc before switching notes");
+    return;
+  }
+  const note = notes.find((candidate) => candidate.id === todo.noteId);
+  if (!note) return;
+  selectedId = note.id;
+  selectedRow = index;
+  showNote(note, focusContent);
+  if (focusContent) {
+    const start = els.content.value.indexOf(todo.line);
+    if (start >= 0) {
+      els.content.setSelectionRange(start, start);
+      els.content.focus();
+    }
+  }
+  paintSelection();
 }
 
 /* ------------------------------------------------------------------ actions */
@@ -227,19 +319,70 @@ async function loadProjects(): Promise<void> {
 }
 
 async function load(keepSelection = false): Promise<void> {
-  const previous = keepSelection ? selectedId : null;
+  const previousNote = keepSelection ? selectedId : null;
+  const previousRow = keepSelection ? selectedRow : -1;
   try {
-    notes = await api.listNotes(filterProjectId, appliedQuery || null);
+    if (todoOnly) {
+      const [lines, all] = await Promise.all([
+        api.listTodoLines(filterProjectId, appliedQuery || null),
+        api.listNotes(filterProjectId, appliedQuery || null),
+      ]);
+      todoLines = lines;
+      notes = all;
+    } else {
+      notes = await api.listNotes(filterProjectId, appliedQuery || null);
+      todoLines = [];
+    }
   } catch (error) {
     showError(error);
     return;
   }
   renderList();
+  if (todoOnly) {
+    if (todoLines.length === 0) {
+      selectedId = null;
+      selectedRow = -1;
+      showNote(null);
+      return;
+    }
+    const next =
+      previousRow >= 0 && previousRow < todoLines.length ? previousRow : 0;
+    openTodo(next);
+    return;
+  }
   const target =
-    previous !== null && notes.some((note) => note.id === previous)
-      ? previous
+    previousNote !== null && notes.some((note) => note.id === previousNote)
+      ? previousNote
       : (notes[0]?.id ?? null);
   select(target);
+}
+
+async function completeTodo(index: number): Promise<void> {
+  if (editing) {
+    showStatus("Save or press Esc before completing");
+    return;
+  }
+  const todo = todoLines[index];
+  if (!todo) return;
+  try {
+    await api.completeTodo(todo.noteId, todo.lineIndex);
+    await load(true);
+    showStatus("Done");
+  } catch (error) {
+    showError(error);
+  }
+}
+
+function toggleTodos(): void {
+  if (editing) {
+    showStatus("Save or press Esc before switching views");
+    return;
+  }
+  todoOnly = !todoOnly;
+  els.todoOnly.classList.toggle("is-active", todoOnly);
+  els.todoOnly.setAttribute("aria-pressed", String(todoOnly));
+  selectedRow = -1;
+  void load();
 }
 
 function applySearch(): void {
@@ -279,8 +422,12 @@ async function save(): Promise<void> {
     els.content.value = updated.content;
     els.meta.textContent = metaText(updated);
     setEditing(false);
-    renderList();
-    paintSelection();
+    if (todoOnly) {
+      await load(true);
+    } else {
+      renderList();
+      paintSelection();
+    }
     showStatus("Saved");
   } catch (error) {
     showError(error);
@@ -325,12 +472,14 @@ function askDeleteNote(): void {
 async function deleteSelectedNote(): Promise<void> {
   const note = current();
   if (!note) return;
+  const index = notes.findIndex((candidate) => candidate.id === note.id);
   try {
     await api.deleteNote(note.id);
-    const index = notes.findIndex((candidate) => candidate.id === note.id);
-    notes = notes.filter((candidate) => candidate.id !== note.id);
-    renderList();
-    select(notes[Math.min(index, notes.length - 1)]?.id ?? null);
+    await load();
+    if (!todoOnly) {
+      const neighbour = notes[Math.min(index, notes.length - 1)];
+      if (neighbour) select(neighbour.id);
+    }
   } catch (error) {
     showError(error);
   }
@@ -430,6 +579,100 @@ async function commitNewProject(): Promise<void> {
   }
 }
 
+/* ----------------------------------------------------------------- splitter */
+
+const LIST_WIDTH_KEY = "jot:browse-list-width";
+const LIST_MIN = 180;
+const LIST_DEFAULT = 280;
+
+function listMax(): number {
+  const width = els.panes.clientWidth;
+  if (width === 0) return 720;
+  return Math.max(LIST_MIN, Math.min(720, width - 320));
+}
+
+function setListWidth(width: number, persist = false): void {
+  const clamped = Math.round(Math.min(Math.max(width, LIST_MIN), listMax()));
+  els.panes.style.setProperty("--list-width", `${clamped}px`);
+  if (!persist) return;
+  try {
+    localStorage.setItem(LIST_WIDTH_KEY, String(clamped));
+  } catch {
+    // Storage may be unavailable; the width just won't persist.
+  }
+}
+
+function restoreListWidth(): void {
+  let stored = Number.NaN;
+  try {
+    stored = Number(localStorage.getItem(LIST_WIDTH_KEY));
+  } catch {
+    // Ignore and fall back to the default.
+  }
+  setListWidth(Number.isFinite(stored) && stored > 0 ? stored : LIST_DEFAULT);
+}
+
+function bindSplitter(): void {
+  let dragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  els.splitter.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    dragging = true;
+    startX = event.clientX;
+    startWidth = els.list.getBoundingClientRect().width;
+    els.splitter.setPointerCapture(event.pointerId);
+    els.splitter.classList.add("is-dragging");
+    document.body.classList.add("is-resizing");
+  });
+
+  els.splitter.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    setListWidth(startWidth + event.clientX - startX);
+  });
+
+  const endDrag = (event: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = false;
+    if (els.splitter.hasPointerCapture(event.pointerId)) {
+      els.splitter.releasePointerCapture(event.pointerId);
+    }
+    els.splitter.classList.remove("is-dragging");
+    document.body.classList.remove("is-resizing");
+    setListWidth(els.list.getBoundingClientRect().width, true);
+  };
+  els.splitter.addEventListener("pointerup", endDrag);
+  els.splitter.addEventListener("pointercancel", endDrag);
+
+  els.splitter.addEventListener("keydown", (event) => {
+    const current = els.list.getBoundingClientRect().width;
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setListWidth(current - 16, true);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setListWidth(current + 16, true);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      setListWidth(LIST_MIN, true);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      setListWidth(listMax(), true);
+    }
+  });
+
+  els.splitter.addEventListener("dblclick", () =>
+    setListWidth(LIST_DEFAULT, true),
+  );
+
+  // Re-clamp when the window narrows, so the detail pane never collapses.
+  window.addEventListener("resize", () =>
+    setListWidth(els.list.getBoundingClientRect().width),
+  );
+}
+
 /* ----------------------------------------------------------------- bindings */
 
 function bindEvents(): void {
@@ -437,6 +680,7 @@ function bindEvents(): void {
   els.save.addEventListener("click", () => void save());
   els.delete.addEventListener("click", askDeleteNote);
   els.removeProject.addEventListener("click", () => void askDeleteProject());
+  els.todoOnly.addEventListener("click", toggleTodos);
   els.noteProject.addEventListener("change", () => void moveNote());
   els.addProject.addEventListener("click", openNewProject);
   els.newProject.addEventListener("keydown", (event) => {
@@ -483,17 +727,20 @@ function bindEvents(): void {
 
   els.list.addEventListener("keydown", (event) => {
     if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    if (editing || notes.length === 0) return;
+    if (editing) return;
+    const count = todoOnly ? todoLines.length : notes.length;
+    if (count === 0) return;
     event.preventDefault();
-    const index = notes.findIndex((note) => note.id === selectedId);
-    const nextIndex =
-      event.key === "ArrowDown"
-        ? Math.min(index + 1, notes.length - 1)
-        : Math.max(index - 1, 0);
-    const target = notes[nextIndex];
-    if (!target) return;
-    select(target.id);
-    focusRow(target.id);
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    const next = Math.min(Math.max(selectedRow + delta, 0), count - 1);
+    if (todoOnly) {
+      openTodo(next);
+    } else {
+      const target = notes[next];
+      if (!target) return;
+      select(target.id);
+    }
+    focusRow(next);
   });
 
   document.addEventListener("keydown", (event) => {
@@ -562,8 +809,10 @@ async function boot(): Promise<void> {
     showError(error);
   }
   bindEvents();
+  bindSplitter();
+  restoreListWidth();
   await load();
-  if (selectedId !== null) focusRow(selectedId);
+  if (selectedRow >= 0) focusRow(selectedRow);
 }
 
 void boot();

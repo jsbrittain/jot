@@ -179,6 +179,8 @@ fn run() {
             commands::list_notes,
             commands::count_notes,
             commands::move_note,
+            commands::list_todo_lines,
+            commands::complete_todo,
             commands::update_note,
             commands::delete_note,
             commands::delete_project,

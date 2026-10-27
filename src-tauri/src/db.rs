@@ -1,3 +1,4 @@
+use std::ops::Range;
 use std::path::Path;
 
 use rusqlite::{params, Connection, OptionalExtension, Result, Row};
@@ -55,6 +56,24 @@ pub struct Note {
 const NOTE_QUERY: &str = "SELECT n.id, n.project_id, p.name, n.created_at, n.updated_at, n.content
      FROM notes n
      JOIN projects p ON p.id = n.project_id";
+
+const TODO_TAG: &str = "#todo";
+const DONE_TAG: &str = "#done";
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoLine {
+    pub note_id: i64,
+    pub project_id: i64,
+    pub project_name: String,
+    pub created_at: String,
+    /// Index of the line within the note content, used to rewrite it later.
+    pub line_index: i64,
+    /// The line as written, tag included.
+    pub line: String,
+    /// The line with the tag stripped, for display.
+    pub text: String,
+}
 
 fn row_to_note(row: &Row<'_>) -> Result<Note> {
     Ok(Note {
@@ -225,6 +244,185 @@ pub fn move_note(conn: &Connection, id: i64, project_id: i64) -> Result<Note> {
         return Err(rusqlite::Error::QueryReturnedNoRows);
     }
     conn.query_row(&format!("{NOTE_QUERY} WHERE n.id = ?1"), [id], row_to_note)
+}
+
+/* --------------------------------------------------------------------- todos */
+
+/// Byte ranges of each line in `content`, excluding the newline.
+fn line_bounds(content: &str) -> Vec<(usize, usize)> {
+    let mut bounds = Vec::new();
+    let mut start = 0;
+    for (index, byte) in content.bytes().enumerate() {
+        if byte == b'\n' {
+            bounds.push((start, index));
+            start = index + 1;
+        }
+    }
+    bounds.push((start, content.len()));
+    bounds
+}
+
+/// Character ranges of `tag` in `line`, matched case-insensitively and only when
+/// the following character is not alphanumeric, so `#todos` does not count.
+fn tag_ranges(line: &str, tag: &str) -> Vec<Range<usize>> {
+    let chars: Vec<char> = line.chars().collect();
+    let needle: Vec<char> = tag.chars().collect();
+    let mut ranges = Vec::new();
+    let mut cursor = 0;
+    while cursor + needle.len() <= chars.len() {
+        let matched = needle
+            .iter()
+            .enumerate()
+            .all(|(offset, expected)| chars[cursor + offset].eq_ignore_ascii_case(expected));
+        let boundary = chars
+            .get(cursor + needle.len())
+            .is_none_or(|next| !next.is_alphanumeric());
+        if matched && boundary {
+            ranges.push(cursor..cursor + needle.len());
+            cursor += needle.len();
+        } else {
+            cursor += 1;
+        }
+    }
+    ranges
+}
+
+fn replace_ranges(line: &str, ranges: &[Range<usize>], replacement: &str) -> String {
+    let chars: Vec<char> = line.chars().collect();
+    let mut out = String::with_capacity(line.len());
+    let mut cursor = 0;
+    for range in ranges {
+        for character in &chars[cursor..range.start] {
+            out.push(*character);
+        }
+        out.push_str(replacement);
+        cursor = range.end;
+    }
+    for character in &chars[cursor..] {
+        out.push(*character);
+    }
+    out
+}
+
+/// The line without its tag, so `#todo send email` reads as `send email`.
+fn display_text(line: &str, ranges: &[Range<usize>]) -> String {
+    if ranges.is_empty() {
+        return line.trim().to_string();
+    }
+    let chars: Vec<char> = line.chars().collect();
+    let mut out = String::with_capacity(line.len());
+    let mut cursor = 0;
+    for range in ranges {
+        for character in &chars[cursor..range.start] {
+            out.push(*character);
+        }
+        // Drop a colon directly after the tag: "#todo: send" reads as "send".
+        cursor = range.end;
+        if chars.get(cursor) == Some(&':') {
+            cursor += 1;
+        }
+    }
+    for character in &chars[cursor..] {
+        out.push(*character);
+    }
+    let cleaned = out.split_whitespace().collect::<Vec<_>>().join(" ");
+    if cleaned.is_empty() {
+        line.trim().to_string()
+    } else {
+        cleaned
+    }
+}
+
+/// One row per `#todo` line, newest note first and document order within a note.
+pub fn list_todo_lines(
+    conn: &Connection,
+    project_id: Option<i64>,
+    query: Option<&str>,
+) -> Result<Vec<TodoLine>> {
+    let needle = query.map(str::trim).unwrap_or_default().to_lowercase();
+    let sql = format!(
+        "{NOTE_QUERY}
+         WHERE (?1 IS NULL OR n.project_id = ?1)
+           AND instr(lower(n.content), '{TODO_TAG}') > 0
+         ORDER BY n.created_at DESC, n.id DESC"
+    );
+    let mut stmt = conn.prepare(&sql)?;
+    let notes = stmt
+        .query_map(params![project_id], row_to_note)?
+        .collect::<Result<Vec<_>>>()?;
+
+    let mut todos = Vec::new();
+    for note in notes {
+        for (index, (start, end)) in line_bounds(&note.content).into_iter().enumerate() {
+            let raw = &note.content[start..end];
+            let line = raw.strip_suffix('\r').unwrap_or(raw);
+            let ranges = tag_ranges(line, TODO_TAG);
+            if ranges.is_empty() {
+                continue;
+            }
+            if !needle.is_empty() && !line.to_lowercase().contains(&needle) {
+                continue;
+            }
+            todos.push(TodoLine {
+                note_id: note.id,
+                project_id: note.project_id,
+                project_name: note.project_name.clone(),
+                created_at: note.created_at.clone(),
+                line_index: index as i64,
+                line: line.trim().to_string(),
+                text: display_text(line, &ranges),
+            });
+        }
+    }
+    Ok(todos)
+}
+
+/// Replace `#todo` with `#done` on one line. Returns `None` when the line no
+/// longer exists or no longer carries the tag, which means the list was stale.
+pub fn complete_todo(conn: &Connection, note_id: i64, line_index: i64) -> Result<Option<Note>> {
+    let content: Option<String> = conn
+        .query_row(
+            "SELECT content FROM notes WHERE id = ?1",
+            [note_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(content) = content else {
+        return Ok(None);
+    };
+    let bounds = line_bounds(&content);
+    let Some(&(start, end)) = bounds.get(line_index as usize) else {
+        return Ok(None);
+    };
+
+    let raw = &content[start..end];
+    let (line, suffix) = match raw.strip_suffix('\r') {
+        Some(stripped) => (stripped, "\r"),
+        None => (raw, ""),
+    };
+    let ranges = tag_ranges(line, TODO_TAG);
+    if ranges.is_empty() {
+        return Ok(None);
+    }
+
+    let replaced = replace_ranges(line, &ranges, DONE_TAG);
+    let new_content = format!(
+        "{}{}{}{}",
+        &content[..start],
+        replaced,
+        suffix,
+        &content[end..]
+    );
+    conn.execute(
+        "UPDATE notes SET content = ?2, updated_at = ?3 WHERE id = ?1",
+        params![note_id, new_content, now()],
+    )?;
+    let note = conn.query_row(
+        &format!("{NOTE_QUERY} WHERE n.id = ?1"),
+        [note_id],
+        row_to_note,
+    )?;
+    Ok(Some(note))
 }
 
 /// Replace the content and stamp `updated_at`. `created_at` never changes.
@@ -509,5 +707,117 @@ mod tests {
         assert!(move_note(&conn, id, 9999).is_err());
         assert!(!project_exists(&conn, 9999).unwrap());
         assert!(project_exists(&conn, inbox).unwrap());
+    }
+
+    #[test]
+    fn tag_matching_ignores_case_but_respects_boundaries() {
+        assert_eq!(tag_ranges("#todo send", TODO_TAG), vec![0..5]);
+        assert_eq!(tag_ranges("#TODO send", TODO_TAG), vec![0..5]);
+        assert_eq!(tag_ranges("send #todo", TODO_TAG), vec![5..10]);
+        assert_eq!(tag_ranges("#todo: send", TODO_TAG), vec![0..5]);
+        assert_eq!(tag_ranges("#todo #todo", TODO_TAG), vec![0..5, 6..11]);
+        assert!(tag_ranges("#todos", TODO_TAG).is_empty());
+        assert!(tag_ranges("#todoist", TODO_TAG).is_empty());
+    }
+
+    #[test]
+    fn todo_text_drops_the_tag_but_keeps_the_rest() {
+        for (line, expected) in [
+            ("#todo send email", "send email"),
+            ("#todo: send email", "send email"),
+            ("Email the RSE team #todo", "Email the RSE team"),
+            ("#TODO book room", "book room"),
+            ("#todo", "#todo"),
+        ] {
+            assert_eq!(display_text(line, &tag_ranges(line, TODO_TAG)), expected);
+        }
+    }
+
+    #[test]
+    fn lists_todo_lines_in_document_order() {
+        let mut conn = memory_db();
+        let inbox = inbox_id(&conn).unwrap();
+        create_note(
+            &mut conn,
+            inbox,
+            "#todo send email\nsome prose\n#todo: book room",
+        )
+        .unwrap();
+
+        let todos = list_todo_lines(&conn, None, None).unwrap();
+        assert_eq!(todos.len(), 2);
+        assert_eq!(todos[0].line_index, 0);
+        assert_eq!(todos[0].text, "send email");
+        assert_eq!(todos[1].line_index, 2);
+        assert_eq!(todos[1].text, "book room");
+    }
+
+    #[test]
+    fn todo_list_respects_project_and_search() {
+        let mut conn = memory_db();
+        let inbox = inbox_id(&conn).unwrap();
+        let rqa = create_project(&conn, "RQA").unwrap();
+        create_note(&mut conn, inbox, "#todo personal admin").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(3));
+        create_note(&mut conn, rqa.id, "#todo email the team").unwrap();
+
+        assert_eq!(list_todo_lines(&conn, None, None).unwrap().len(), 2);
+        assert_eq!(list_todo_lines(&conn, Some(rqa.id), None).unwrap().len(), 1);
+
+        let hits = list_todo_lines(&conn, None, Some("EMAIL")).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].text, "email the team");
+    }
+
+    #[test]
+    fn completing_a_todo_swaps_the_tag_and_bumps_updated_at() {
+        let mut conn = memory_db();
+        let inbox = inbox_id(&conn).unwrap();
+        let id = create_note(
+            &mut conn,
+            inbox,
+            "Meeting notes\n#todo send email\nmore prose",
+        )
+        .unwrap();
+        let before = list_notes(&conn, None, None).unwrap()[0].clone();
+        std::thread::sleep(std::time::Duration::from_millis(3));
+
+        let updated = complete_todo(&conn, id, 1).unwrap().expect("completed");
+
+        assert_eq!(
+            updated.content,
+            "Meeting notes\n#done send email\nmore prose"
+        );
+        assert_eq!(updated.created_at, before.created_at);
+        assert!(
+            updated.updated_at > before.updated_at,
+            "completion is an edit"
+        );
+        let open = list_todo_lines(&conn, None, None).unwrap();
+        assert!(open.is_empty(), "completed items leave the list");
+    }
+
+    #[test]
+    fn completing_a_stale_line_returns_none() {
+        let mut conn = memory_db();
+        let inbox = inbox_id(&conn).unwrap();
+        let id = create_note(&mut conn, inbox, "#todo first\nnothing here").unwrap();
+
+        assert!(
+            complete_todo(&conn, id, 1).unwrap().is_none(),
+            "line has no tag"
+        );
+        assert!(
+            complete_todo(&conn, id, 99).unwrap().is_none(),
+            "out of range"
+        );
+        assert!(
+            complete_todo(&conn, 4242, 0).unwrap().is_none(),
+            "note is gone"
+        );
+        assert_eq!(
+            complete_todo(&conn, id, 0).unwrap().unwrap().content,
+            "#done first\nnothing here"
+        );
     }
 }

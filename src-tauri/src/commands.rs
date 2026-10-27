@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 
-use crate::db::{self, Note, Project};
+use crate::db::{self, Note, Project, TodoLine};
 use crate::AppState;
 
 const LAST_PROJECT: &str = "last_project_id";
@@ -130,6 +130,28 @@ pub fn move_note(state: State<'_, AppState>, id: i64, project_id: i64) -> Result
         return Err("That project no longer exists".into());
     }
     db::move_note(&conn, id, project_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_todo_lines(
+    state: State<'_, AppState>,
+    project_id: Option<i64>,
+    query: Option<String>,
+) -> Result<Vec<TodoLine>, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::list_todo_lines(&conn, project_id, query.as_deref()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn complete_todo(
+    state: State<'_, AppState>,
+    note_id: i64,
+    line_index: i64,
+) -> Result<Note, String> {
+    let conn = state.db.lock().map_err(|e| e.to_string())?;
+    db::complete_todo(&conn, note_id, line_index)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "That line has changed — reopen the todo list".to_string())
 }
 
 #[tauri::command]

@@ -17,6 +17,16 @@ export interface Note {
   content: string;
 }
 
+export interface TodoLine {
+  noteId: number;
+  projectId: number;
+  projectName: string;
+  createdAt: string;
+  lineIndex: number;
+  line: string;
+  text: string;
+}
+
 /** Why the user tried to leave the current draft. */
 export type CloseIntent = "hide" | "quit";
 
@@ -60,6 +70,10 @@ export const api = {
     tauri().core.invoke<number>("count_notes", { projectId }),
   moveNote: (id: number, projectId: number) =>
     tauri().core.invoke<Note>("move_note", { id, projectId }),
+  listTodoLines: (projectId: number | null, query: string | null = null) =>
+    tauri().core.invoke<TodoLine[]>("list_todo_lines", { projectId, query }),
+  completeTodo: (noteId: number, lineIndex: number) =>
+    tauri().core.invoke<Note>("complete_todo", { noteId, lineIndex }),
   updateNote: (id: number, content: string) =>
     tauri().core.invoke<Note>("update_note", { id, content }),
   deleteNote: (id: number) => tauri().core.invoke<void>("delete_note", { id }),
