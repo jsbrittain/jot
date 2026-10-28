@@ -1,4 +1,5 @@
 import { api, type CloseIntent, type Project } from "./api.js";
+import { applyTheme, isTheme, type ThemeId } from "./theme.js";
 
 const uiStart = performance.now();
 const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
@@ -31,6 +32,7 @@ let dirty = false;
 let busy = false;
 let creatingProject = false;
 let pendingIntent: CloseIntent = "hide";
+let committedTheme: ThemeId = "system";
 let errorTimer: number | undefined;
 let hintTimer: number | undefined;
 
@@ -172,6 +174,8 @@ async function requestClose(): Promise<void> {
 async function refresh(): Promise<void> {
   const data = await api.bootstrap();
   projects = data.projects;
+  committedTheme = isTheme(data.theme) ? data.theme : "system";
+  applyTheme(committedTheme);
   renderProjects(data.lastProjectId ?? projects[0]?.id ?? null);
 }
 
@@ -330,6 +334,11 @@ async function boot(): Promise<void> {
     await api.ready();
     await api.onShown(() => void handleShown());
     await api.onCloseAttempted(showDiscard);
+    await api.onThemeChanged((theme) => {
+      if (!isTheme(theme)) return;
+      committedTheme = theme;
+      applyTheme(theme);
+    });
   } catch (error) {
     showError(error);
   }

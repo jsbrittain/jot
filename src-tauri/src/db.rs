@@ -179,6 +179,15 @@ pub fn get_setting(conn: &Connection, key: &str) -> Result<Option<String>> {
     .optional()
 }
 
+pub fn set_setting(conn: &Connection, key: &str, value: &str) -> Result<()> {
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value],
+    )?;
+    Ok(())
+}
+
 /// Insert a note and remember its project, atomically. Returns the new note id.
 pub fn create_note(conn: &mut Connection, project_id: i64, content: &str) -> Result<i64> {
     let timestamp = now();
@@ -819,5 +828,17 @@ mod tests {
             complete_todo(&conn, id, 0).unwrap().unwrap().content,
             "#done first\nnothing here"
         );
+    }
+
+    #[test]
+    fn settings_round_trip_and_overwrite() {
+        let conn = memory_db();
+        assert_eq!(get_setting(&conn, "theme").unwrap(), None);
+
+        set_setting(&conn, "theme", "slate").unwrap();
+        assert_eq!(get_setting(&conn, "theme").unwrap(), Some("slate".into()));
+
+        set_setting(&conn, "theme", "paper").unwrap();
+        assert_eq!(get_setting(&conn, "theme").unwrap(), Some("paper".into()));
     }
 }

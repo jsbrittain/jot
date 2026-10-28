@@ -1,4 +1,5 @@
 import { api, type Note, type Project, type TodoLine } from "./api.js";
+import { THEMES, applyTheme, isTheme, type ThemeId } from "./theme.js";
 
 const when = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -17,6 +18,8 @@ const els = {
   todoOnly: el<HTMLButtonElement>("#todo-only"),
   panes: el<HTMLDivElement>(".browse-panes"),
   splitter: el<HTMLDivElement>("#splitter"),
+  theme: el<HTMLButtonElement>("#theme"),
+  themeMenu: el<HTMLDivElement>("#theme-menu"),
   removeProject: el<HTMLButtonElement>("#remove-project"),
   addProject: el<HTMLButtonElement>("#add-project"),
   newProject: el<HTMLInputElement>("#new-project-name"),
@@ -47,6 +50,7 @@ let appliedQuery = "";
 let editing = false;
 let busy = false;
 let creatingProject = false;
+let committedTheme: ThemeId = "system";
 let statusTimer: number | undefined;
 let confirmAction: (() => Promise<void>) | null = null;
 
@@ -313,6 +317,8 @@ function openTodo(index: number, focusContent = false): void {
 async function loadProjects(): Promise<void> {
   const data = await api.bootstrap();
   projects = data.projects;
+  committedTheme = isTheme(data.theme) ? data.theme : "system";
+  applyTheme(committedTheme);
   renderFilter();
   updateRemoveButton();
   renderNoteProjects(current()?.projectId ?? null);
@@ -673,6 +679,71 @@ function bindSplitter(): void {
   );
 }
 
+/* -------------------------------------------------------------------- theme */
+
+function paintThemeMenu(): void {
+  for (const option of els.themeMenu.querySelectorAll<HTMLElement>(
+    ".theme-option",
+  )) {
+    option.setAttribute(
+      "aria-checked",
+      String(option.dataset.theme === committedTheme),
+    );
+  }
+}
+
+function buildThemeMenu(): void {
+  els.themeMenu.replaceChildren(
+    ...THEMES.map((theme) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "theme-option";
+      option.setAttribute("role", "menuitemradio");
+      option.dataset.theme = theme.id;
+      option.textContent = theme.label;
+      // Hover or focus previews the background without committing it.
+      option.addEventListener("pointerenter", () => applyTheme(theme.id));
+      option.addEventListener("focus", () => applyTheme(theme.id));
+      option.addEventListener("click", () => void chooseTheme(theme.id));
+      return option;
+    }),
+  );
+  paintThemeMenu();
+}
+
+async function chooseTheme(theme: ThemeId): Promise<void> {
+  committedTheme = theme;
+  applyTheme(theme);
+  paintThemeMenu();
+  closeThemeMenu();
+  els.theme.focus();
+  await api.setTheme(theme).catch(showError);
+}
+
+function openThemeMenu(): void {
+  els.themeMenu.hidden = false;
+  els.theme.setAttribute("aria-expanded", "true");
+  paintThemeMenu();
+  const selected = els.themeMenu.querySelector<HTMLElement>(
+    `[data-theme="${committedTheme}"]`,
+  );
+  const target =
+    selected ?? (els.themeMenu.firstElementChild as HTMLElement | null);
+  target?.focus();
+}
+
+function closeThemeMenu(): void {
+  els.themeMenu.hidden = true;
+  els.theme.setAttribute("aria-expanded", "false");
+  // Undo any preview left by hovering.
+  applyTheme(committedTheme);
+}
+
+function toggleThemeMenu(): void {
+  if (els.themeMenu.hidden) openThemeMenu();
+  else closeThemeMenu();
+}
+
 /* ----------------------------------------------------------------- bindings */
 
 function bindEvents(): void {
@@ -681,6 +752,25 @@ function bindEvents(): void {
   els.delete.addEventListener("click", askDeleteNote);
   els.removeProject.addEventListener("click", () => void askDeleteProject());
   els.todoOnly.addEventListener("click", toggleTodos);
+  els.theme.addEventListener("click", toggleThemeMenu);
+  els.themeMenu.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const options = [
+      ...els.themeMenu.querySelectorAll<HTMLElement>(".theme-option"),
+    ];
+    if (options.length === 0) return;
+    const index = options.indexOf(document.activeElement as HTMLElement);
+    const next = event.key === "ArrowDown" ? index + 1 : index - 1;
+    options[(next + options.length) % options.length]?.focus();
+  });
+  document.addEventListener("pointerdown", (event) => {
+    if (els.themeMenu.hidden) return;
+    const target = event.target as Node;
+    if (!els.themeMenu.contains(target) && !els.theme.contains(target)) {
+      closeThemeMenu();
+    }
+  });
   els.noteProject.addEventListener("change", () => void moveNote());
   els.addProject.addEventListener("click", openNewProject);
   els.newProject.addEventListener("keydown", (event) => {
@@ -763,6 +853,11 @@ function bindEvents(): void {
     }
     if (event.key !== "Escape") return;
     event.preventDefault();
+    if (!els.themeMenu.hidden) {
+      closeThemeMenu();
+      els.theme.focus();
+      return;
+    }
     if (creatingProject) {
       closeNewProject();
       return;
@@ -811,8 +906,10 @@ async function boot(): Promise<void> {
   bindEvents();
   bindSplitter();
   restoreListWidth();
+  buildThemeMenu();
   await load();
   if (selectedRow >= 0) focusRow(selectedRow);
+  await api.browseReady().catch(showError);
 }
 
 void boot();
