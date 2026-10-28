@@ -1,12 +1,14 @@
 use std::sync::atomic::Ordering;
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::{self, Note, Project, TodoLine};
 use crate::AppState;
 
 const LAST_PROJECT: &str = "last_project_id";
+const THEME_KEY: &str = "theme";
+const THEMES: [&str; 4] = ["system", "paper", "slate", "black"];
 const MAX_PROJECT_NAME: usize = 100;
 
 /// Startup telemetry is on in debug builds and whenever `JOT_TIMING` is set,
@@ -21,6 +23,8 @@ pub struct Bootstrap {
     projects: Vec<Project>,
     /// Falls back to none when the remembered project no longer exists.
     last_project_id: Option<i64>,
+    /// The saved background, if it is one this build understands.
+    theme: Option<String>,
 }
 
 /// Everything the capture window needs in one round trip.
@@ -32,10 +36,28 @@ pub fn bootstrap(state: State<'_, AppState>) -> Result<Bootstrap, String> {
         .map_err(|e| e.to_string())?
         .and_then(|value| value.parse::<i64>().ok())
         .filter(|id| projects.iter().any(|p| p.id == *id));
+    let theme = db::get_setting(&conn, THEME_KEY)
+        .map_err(|e| e.to_string())?
+        .filter(|value| THEMES.contains(&value.as_str()));
     Ok(Bootstrap {
         projects,
         last_project_id,
+        theme,
     })
+}
+
+#[tauri::command]
+pub fn set_theme(app: AppHandle, state: State<'_, AppState>, theme: String) -> Result<(), String> {
+    if !THEMES.contains(&theme.as_str()) {
+        return Err("Unknown background".into());
+    }
+    {
+        let conn = state.db.lock().map_err(|e| e.to_string())?;
+        db::set_setting(&conn, THEME_KEY, &theme).map_err(|e| e.to_string())?;
+    }
+    // The capture window may be visible behind the browse window.
+    let _ = app.emit("theme-changed", theme);
+    Ok(())
 }
 
 /// Signals that the frontend has loaded. Release builds stay silent on purpose:
@@ -194,11 +216,34 @@ pub fn open_browser(app: AppHandle) -> Result<(), String> {
         .title("Notes")
         .inner_size(900.0, 620.0)
         .min_inner_size(680.0, 440.0)
+        // Shown by `browse_ready` once the saved background is applied, so a
+        // dark theme does not flash the default for a frame.
+        .visible(false)
         .build()
         .map_err(|e| e.to_string())?;
+
+        // Safety net, in case the frontend never signals readiness.
+        let handle = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(1200));
+            if let Some(window) = handle.get_webview_window("browse") {
+                if !window.is_visible().unwrap_or(true) {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+        });
     }
     crate::hide_capture_if_clean(&app);
     Ok(())
+}
+
+#[tauri::command]
+pub fn browse_ready(app: AppHandle) {
+    if let Some(window) = app.get_webview_window("browse") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
 }
 
 #[tauri::command]

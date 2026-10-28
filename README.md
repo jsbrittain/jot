@@ -120,6 +120,20 @@ button in the toolbar swaps the note list for one row per **open** todo:
 Completed items stay in the note as `#done`; searching for `#done` is the history
 view. No tag tables are involved — the view is derived from the note text.
 
+## Appearance
+
+The `◐` button at the right of the browse toolbar chooses the background:
+
+- **System** — follows your light/dark setting (the default)
+- **Warm paper** — a cream light theme
+- **Slate** — blue-grey dark
+- **Black** — near-black
+
+Hovering an option previews it; clicking commits. The choice is stored in the
+database (`settings.theme`), so it survives restarts and travels with a backup,
+and it applies to both windows. The browse window is created hidden and only shown
+once the background is applied, so a dark theme does not flash the default.
+
 ## Startup
 
 Launching Jot shows no window. It starts resident and waits to be summoned, so

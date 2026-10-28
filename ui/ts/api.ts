@@ -6,6 +6,7 @@ export interface Project {
 export interface Bootstrap {
   projects: Project[];
   lastProjectId: number | null;
+  theme: string | null;
 }
 
 export interface Note {
@@ -80,7 +81,14 @@ export const api = {
   deleteProject: (id: number) =>
     tauri().core.invoke<void>("delete_project", { id }),
   openBrowser: () => tauri().core.invoke<void>("open_browser"),
+  browseReady: () => tauri().core.invoke<void>("browse_ready"),
   closeBrowser: () => tauri().core.invoke<void>("close_browser"),
+  setTheme: (theme: string) =>
+    tauri().core.invoke<void>("set_theme", { theme }),
+  onThemeChanged: (handler: (theme: string) => void) =>
+    tauri().event.listen<string>("theme-changed", (event) =>
+      handler(event.payload),
+    ),
   setBrowseDirty: (dirty: boolean) =>
     tauri().core.invoke<void>("set_browse_dirty", { dirty }),
   setDirty: (dirty: boolean) =>
