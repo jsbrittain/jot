@@ -22,6 +22,7 @@ import {
   renderBoard,
   toggleBoard,
 } from "./board.js";
+import { initSplitter } from "./splitter.js";
 import {
   closeOverlays,
   initArchive,
@@ -38,6 +39,7 @@ async function start(): Promise<void> {
   initBoardVisibility();
   initPage();
   initBoard();
+  initSplitter();
   initArchive();
   renderBoard();
   wireShell();

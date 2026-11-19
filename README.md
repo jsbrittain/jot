@@ -48,8 +48,9 @@ pnpm build        # platform installer/bundle in src-tauri/target/release/bundle
 | Close an overlay, or hide the window | `Esc` |
 | Summon the window from another app | `Cmd/Ctrl+Shift+J` |
 
-- Select text and press `Cmd/Ctrl+S`: a bar appears with the target project
-  preselected. `Enter` pins, typing filters projects, `Esc` cancels.
+- Select text and press `Cmd/Ctrl+S`: a bar shows the snippet and every project.
+  `Enter` pins to Inbox; `↑`/`↓` choose another project, typing filters or creates
+  one, and `Esc` cancels. The Pin button always shows the target project.
 - Pinning **cuts** the text out of the page. It appears at the top of the board
   with a timestamp. `Cmd/Ctrl+Z`, or Undo in the toast, restores it exactly.
 - The page autosaves. There is no save button, no save shortcut and no
@@ -57,6 +58,10 @@ pnpm build        # platform installer/bundle in src-tauri/target/release/bundle
 - Tick a snippet to move it to the collapsed **Done** shelf. Unpin it to remove it
   from the board without deleting it; it remains in the archive.
 - Drag a card by its handle, or focus it and use `Cmd/Ctrl+Up/Down`.
+- The page and the board scroll independently: the top bars, project chips, footer
+  and Done shelf stay put while the text and the snippet list scroll.
+- Drag the divider between the page and the board to resize the rail; double-click
+  resets it, or focus it and use `←`/`→`, `Home`/`End`.
 - Projects are flat labels. A snippet can have one, or none — that is Inbox.
   Deleting a project keeps its snippets and makes them unlabelled.
 - `Cmd/Ctrl+F` opens the archive: case-insensitive search over snippet text,

@@ -52,11 +52,12 @@
                 role="combobox"
                 aria-expanded="false"
                 aria-controls="commit-suggest"
+                placeholder="Filter or create a project"
               />
               <ul id="commit-suggest" class="suggest" role="listbox" hidden></ul>
             </div>
             <button id="commit-confirm" class="primary" type="button" title="Pin selection">
-              Pin
+              Pin to Inbox
             </button>
             <button id="commit-cancel" class="ghost small" type="button">Esc</button>
           </div>
@@ -75,6 +76,18 @@
           </div>
         </footer>
       </main>
+
+      <div
+        id="splitter"
+        class="splitter"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize board"
+        aria-valuemin="280"
+        aria-valuemax="640"
+        aria-valuenow="340"
+        tabindex="0"
+      ></div>
 
       <aside id="board" class="board" aria-label="Board">
         <header class="board-head">

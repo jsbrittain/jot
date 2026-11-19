@@ -2,7 +2,6 @@ import { api, type Page } from "./api.js";
 import {
   applyCommit,
   getPage,
-  projectById,
   projectName,
   removeItem,
   setPage,
@@ -12,6 +11,7 @@ import {
 import { renderBoard } from "./board.js";
 import {
   el,
+  hideToast,
   longToday,
   showError,
   timeLabel,
@@ -169,29 +169,11 @@ function paragraphRange(value: string, caret: number): [number, number] {
   return [start, end];
 }
 
-function defaultProject(): { id: number | null; name: string } {
-  if (typeof state.filter === "number") {
-    const project = projectById(state.filter);
-    if (project) {
-      return { id: project.id, name: project.name };
-    }
-  }
-  if (state.filter === "inbox") {
-    return { id: null, name: "Inbox" };
-  }
-  if (state.lastProjectId !== null) {
-    const project = projectById(state.lastProjectId);
-    if (project) {
-      return { id: project.id, name: project.name };
-    }
-  }
-  return { id: null, name: "Inbox" };
-}
-
 export function beginCommit(): void {
   if (!commitBar.hidden) {
     return;
   }
+  hideToast();
 
   const value = pageInput.value;
   let start = pageInput.selectionStart;
@@ -221,15 +203,13 @@ export function beginCommit(): void {
   };
 
   commitPreview.textContent = snippet;
-  const choice = defaultProject();
-  commitInput.value = choice.name;
+  commitInput.value = "";
   suggestionIndex = 0;
-  renderSuggestions(commitInput.value);
+  renderSuggestions("");
   commitBar.hidden = false;
   commitConfirm.disabled = false;
   commitInput.disabled = false;
   commitInput.focus();
-  commitInput.select();
 }
 
 export function cancelCommit(): void {
@@ -252,6 +232,7 @@ function hideCommitBar(): void {
   commitSuggest.hidden = true;
   commitInput.setAttribute("aria-expanded", "false");
   commitInput.value = "";
+  commitConfirm.textContent = "Pin to Inbox";
   commitConfirm.disabled = false;
   commitInput.disabled = false;
 }
@@ -313,6 +294,34 @@ function renderSuggestions(query: string): void {
   );
   commitSuggest.hidden = list.length === 0;
   commitInput.setAttribute("aria-expanded", String(!commitSuggest.hidden));
+  updateConfirmLabel();
+  scrollActiveIntoView();
+}
+
+function updateConfirmLabel(): void {
+  const choice = suggestions[suggestionIndex];
+  if (!choice) {
+    commitConfirm.textContent = "Pin to Inbox";
+    return;
+  }
+  commitConfirm.textContent =
+    choice.kind === "create" ? `Pin to “${choice.name}”` : `Pin to ${choice.name}`;
+}
+
+function scrollActiveIntoView(): void {
+  window.requestAnimationFrame(() => {
+    const active = commitSuggest.children[suggestionIndex];
+    if (!(active instanceof HTMLElement)) {
+      return;
+    }
+    const top = active.offsetTop;
+    const bottom = top + active.offsetHeight;
+    if (top < commitSuggest.scrollTop) {
+      commitSuggest.scrollTop = top;
+    } else if (bottom > commitSuggest.scrollTop + commitSuggest.clientHeight) {
+      commitSuggest.scrollTop = bottom - commitSuggest.clientHeight;
+    }
+  });
 }
 
 function moveSuggestion(delta: number): void {
@@ -333,6 +342,16 @@ function onCommitKeyDown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     moveSuggestion(-1);
+  } else if (event.key === "Home") {
+    event.preventDefault();
+    event.stopPropagation();
+    suggestionIndex = 0;
+    renderSuggestions(commitInput.value);
+  } else if (event.key === "End") {
+    event.preventDefault();
+    event.stopPropagation();
+    suggestionIndex = Math.max(0, suggestions.length - 1);
+    renderSuggestions(commitInput.value);
   } else if (event.key === "Enter") {
     event.preventDefault();
     event.stopPropagation();

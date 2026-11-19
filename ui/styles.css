@@ -135,7 +135,7 @@ button.danger {
 
 .app {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--rail-width);
+  grid-template-columns: minmax(0, 1fr) 7px var(--rail-width);
   height: 100vh;
 }
 
@@ -143,7 +143,8 @@ button.danger {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.app.board-hidden .board {
+.app.board-hidden .board,
+.app.board-hidden .splitter {
   display: none;
 }
 
@@ -151,7 +152,42 @@ button.danger {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   height: 100%;
+}
+
+/* ---------------------------------------------------------------- splitter */
+
+.splitter {
+  position: relative;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 3px;
+  width: 1px;
+  background: var(--line);
+  transition: background 120ms ease, width 120ms ease;
+}
+
+.splitter:hover::after,
+.splitter.is-dragging::after,
+.splitter:focus-visible::after {
+  width: 2px;
+  background: var(--accent);
+}
+
+.splitter:focus-visible {
+  outline: none;
+}
+
+body.is-resizing {
+  cursor: col-resize;
+  user-select: none;
 }
 
 /* ------------------------------------------------------------------ topbar */
@@ -206,6 +242,7 @@ button.danger {
   min-height: 0;
   display: flex;
   justify-content: center;
+  overflow: hidden;
 }
 
 .page {
@@ -216,6 +253,8 @@ button.danger {
   padding: 18px 30px 80px;
   border: 0;
   resize: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: transparent;
   color: var(--fg);
   font: 14.5px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -367,9 +406,10 @@ button.danger {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
   background: var(--rail);
-  border-left: 1px solid var(--line);
 }
 
 .board-head {
@@ -391,6 +431,7 @@ button.danger {
 }
 
 .chips {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -427,9 +468,10 @@ button.chip.chip-add {
 }
 
 .cards {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   list-style: none;
   margin: 0;
   padding: 0 10px 12px;
@@ -1062,6 +1104,10 @@ select.card-project:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .splitter {
+    display: none;
+  }
+
   .board {
     position: fixed;
     top: 0;
@@ -1069,6 +1115,7 @@ select.card-project:focus-visible {
     bottom: 0;
     z-index: 30;
     width: min(360px, 92vw);
+    border-left: 1px solid var(--line);
     box-shadow: -18px 0 50px rgb(0 0 0 / 20%);
   }
 
