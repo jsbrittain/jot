@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Snippets</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <main class="page-pane">
+        <header class="topbar">
+          <span id="page-date" class="page-date"></span>
+          <div class="topbar-actions">
+            <button
+              id="toggle-board"
+              class="ghost board-toggle"
+              type="button"
+              title="Toggle board"
+              aria-expanded="true"
+            >
+              Board<span id="board-count" class="count">0</span>
+            </button>
+            <button id="open-archive" class="ghost" type="button" title="Search the archive">
+              Archive
+            </button>
+          </div>
+        </header>
+
+        <div class="page-scroll">
+          <textarea
+            id="page"
+            class="page"
+            spellcheck="false"
+            aria-label="Notes"
+            autofocus
+          ></textarea>
+        </div>
+
+        <div id="commit-bar" class="commit-bar" hidden>
+          <div id="commit-preview" class="commit-preview"></div>
+          <div class="commit-row">
+            <span class="commit-arrow" aria-hidden="true">→</span>
+            <div class="commit-project">
+              <input
+                id="commit-project"
+                class="commit-input"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Project for this snippet"
+                role="combobox"
+                aria-expanded="false"
+                aria-controls="commit-suggest"
+              />
+              <ul id="commit-suggest" class="suggest" role="listbox" hidden></ul>
+            </div>
+            <button id="commit-confirm" class="primary" type="button">Pin</button>
+            <button id="commit-cancel" class="ghost small" type="button">Esc</button>
+          </div>
+        </div>
+
+        <footer class="page-foot">
+          <span id="save-status" class="save-status" role="status" aria-live="polite"></span>
+          <div class="page-foot-actions">
+            <span id="hint" class="hint"></span>
+            <button id="open-pages" class="ghost small" type="button" title="Pages">
+              Pages
+            </button>
+            <button id="new-page" class="ghost small" type="button" title="New page">
+              New page
+            </button>
+          </div>
+        </footer>
+      </main>
+
+      <aside id="board" class="board" aria-label="Board">
+        <header class="board-head">
+          <h2>Board</h2>
+          <button
+            id="collapse-board"
+            class="icon"
+            type="button"
+            title="Hide board"
+            aria-label="Hide board"
+          >
+            ›
+          </button>
+        </header>
+        <div id="board-chips" class="chips"></div>
+        <ul id="board-list" class="cards"></ul>
+        <div id="done-shelf" class="done-shelf" hidden>
+          <button id="done-toggle" class="done-toggle" type="button" aria-expanded="false">
+            Done <span id="done-count">0</span>
+          </button>
+          <ul id="done-list" class="cards cards-done" hidden></ul>
+          <button id="clear-done" class="ghost small" type="button">Clear done</button>
+        </div>
+      </aside>
+    </div>
+
+    <div id="archive" class="overlay" hidden>
+      <section class="panel" role="dialog" aria-modal="true" aria-label="Archive">
+        <header class="overlay-head">
+          <input
+            id="archive-search"
+            class="search"
+            type="search"
+            placeholder="Search snippets"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Search snippets"
+          />
+          <button id="archive-close" class="icon" type="button" title="Close" aria-label="Close">
+            ×
+          </button>
+        </header>
+        <div class="overlay-bar">
+          <div id="archive-chips" class="chips"></div>
+          <label class="check">
+            <input id="archive-done" type="checkbox" checked />
+            include done
+          </label>
+          <button id="manage-projects" class="ghost small" type="button">Projects</button>
+        </div>
+        <div id="project-manager" class="project-manager" hidden>
+          <ul id="project-list" class="project-list"></ul>
+          <div class="project-add">
+            <input
+              id="project-add-name"
+              type="text"
+              placeholder="New project"
+              maxlength="100"
+              autocomplete="off"
+              aria-label="New project name"
+            />
+            <button id="project-add" class="primary small" type="button">Add</button>
+          </div>
+        </div>
+        <div id="archive-body" class="archive-body"></div>
+        <p id="archive-status" class="archive-status" hidden></p>
+      </section>
+    </div>
+
+    <div id="pages" class="overlay" hidden>
+      <section class="panel panel-small" role="dialog" aria-modal="true" aria-label="Pages">
+        <header class="overlay-head">
+          <h2>Pages</h2>
+          <button id="pages-close" class="icon" type="button" title="Close" aria-label="Close">
+            ×
+          </button>
+        </header>
+        <ul id="pages-list" class="pages-list"></ul>
+        <footer class="overlay-foot">
+          <button id="pages-new" class="ghost small" type="button">New page</button>
+        </footer>
+      </section>
+    </div>
+
+    <div id="modal" class="overlay modal-overlay" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <h2 id="modal-title"></h2>
+        <p id="modal-message"></p>
+        <input id="modal-input" type="text" hidden />
+        <div class="modal-actions">
+          <button id="modal-cancel" class="ghost" type="button">Cancel</button>
+          <button id="modal-confirm" class="primary" type="button">OK</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" hidden role="status" aria-live="polite">
+      <span id="toast-text"></span>
+      <button id="toast-undo" class="ghost small" type="button" hidden>Undo</button>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
