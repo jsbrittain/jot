@@ -41,6 +41,20 @@ the UI and reload the window (`Cmd/Ctrl+R`).
 
 If `cargo` is not found: `source "$HOME/.cargo/env"` or open a new terminal.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` runs both suites on macOS — the platform this is
+developed and used on — for pushes to `main`, pull requests and manual runs:
+
+- **Rust:** `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test`.
+- **UI:** `pnpm test:ui` under Playwright, with the Chromium download cached
+  between runs.
+
+Binaries are deliberately not built in CI. The trade-off is that Linux/Windows
+compile regressions and Linux-only lints are not caught there; everything is
+verified on the one platform it ships on. `rust-toolchain.toml` pins the compiler
+so local and CI builds use the same version.
+
 ## Build
 
 ```sh
