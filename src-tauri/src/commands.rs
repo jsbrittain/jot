@@ -51,8 +51,8 @@ pub fn bootstrap(state: State<'_, AppState>) -> Result<Bootstrap, String> {
 
 #[tauri::command]
 pub fn ready(state: State<'_, AppState>) {
-    if cfg!(debug_assertions) || std::env::var_os("SNIPPETS_TIMING").is_some() {
-        println!("[snippets] frontend ready in {:?}", state.started.elapsed());
+    if cfg!(debug_assertions) || std::env::var_os("JOT_TIMING").is_some() {
+        println!("[jot] frontend ready in {:?}", state.started.elapsed());
     }
 }
 

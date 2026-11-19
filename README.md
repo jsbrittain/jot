@@ -1,7 +1,8 @@
-# Snippets
+# Jot
 
-A page-first scratchpad. Write freely, then select a phrase and pin it to a project.
-Pinned snippets become a board of current items: tick them, reorder them, unpin them.
+Jot is a page-first scratchpad. Write freely, then select a phrase and pin it to a
+project. Pinned snippets become a board of current items: tick them, reorder them,
+unpin them.
 Everything ever pinned stays searchable in the archive.
 
 The page is the uncommitted remainder of your thinking. The board is the current
@@ -100,7 +101,9 @@ One SQLite database in the platform application data directory:
 | Windows | `%APPDATA%\dev.jsb.snippets\snippets.db` |
 | Linux | `~/.local/share/dev.jsb.snippets/snippets.db` |
 
-Timestamps are stored as RFC 3339 UTC and rendered in local time. Snippets are
+The app is called Jot, but the internal bundle identifier and data directory remain
+`dev.jsb.snippets` so the notes created before the rename are reused. Timestamps are
+stored as RFC 3339 UTC and rendered in local time. Snippets are
 stored as plain Markdown source; search matches that source, and rendering is only
 a view. Because the database runs in WAL mode, back up the whole directory rather
 than only `snippets.db`.

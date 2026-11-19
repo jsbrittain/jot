@@ -1995,6 +1995,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "jot"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "opener",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-single-instance",
+ "url",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3426,22 +3442,6 @@ name = "smallvec"
 version = "1.16.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3244542535d5de959d90ec55d1b5ff0fd2bb7b1310223907d5f11932847f7b59"
-
-[[package]]
-name = "snippets"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "opener",
- "rusqlite",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-single-instance",
- "url",
-]
 
 [[package]]
 name = "socket2"

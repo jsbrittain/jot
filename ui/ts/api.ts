@@ -78,7 +78,7 @@ declare global {
 function tauri(): TauriGlobal {
   const global = window.__TAURI__;
   if (!global) {
-    throw new Error("Not running inside the Snippets desktop app");
+    throw new Error("Not running inside the Jot desktop app");
   }
   return global;
 }

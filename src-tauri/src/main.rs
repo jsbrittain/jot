@@ -37,14 +37,14 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     use tauri::menu::{Menu, MenuItem};
     use tauri::tray::TrayIconBuilder;
 
-    let open = MenuItem::with_id(app, "open", "Open Snippets", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open Jot", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &quit])?;
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
 
-    TrayIconBuilder::with_id("snippets-tray")
+    TrayIconBuilder::with_id("jot-tray")
         .icon(icon)
-        .tooltip("Snippets")
+        .tooltip("Jot")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -83,7 +83,7 @@ fn register_global_shortcut(app: &AppHandle) -> tauri::Result<()> {
     )?;
 
     if let Err(error) = app.global_shortcut().register(shortcut) {
-        eprintln!("[snippets] global shortcut unavailable: {error}");
+        eprintln!("[jot] global shortcut unavailable: {error}");
     }
     Ok(())
 }
@@ -98,10 +98,11 @@ fn run() {
         .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
+            // Keep the original database file name so existing notes are reused.
             let db_path = data_dir.join("snippets.db");
             let conn = db::open(&db_path)?;
-            if cfg!(debug_assertions) || std::env::var_os("SNIPPETS_TIMING").is_some() {
-                println!("[snippets] database: {}", db_path.display());
+            if cfg!(debug_assertions) || std::env::var_os("JOT_TIMING").is_some() {
+                println!("[jot] database: {}", db_path.display());
             }
             app.manage(AppState {
                 db: Mutex::new(conn),
@@ -149,7 +150,7 @@ fn run() {
             let _ = window.hide();
         })
         .build(tauri::generate_context!())
-        .expect("failed to build Snippets");
+        .expect("failed to build Jot");
 
     app.run(|app, event| match event {
         RunEvent::ExitRequested { api, .. }
