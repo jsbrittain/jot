@@ -56,6 +56,12 @@ jobs:
       - name: Type-check the frontend
         run: pnpm build:ui
 
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: UI tests
+        run: pnpm test:ui
+
       - name: Check formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 

@@ -21,7 +21,18 @@ working set. The archive is the record.
 pnpm install
 pnpm dev          # compiles TypeScript, then launches the app
 pnpm test         # Rust unit tests (in-memory SQLite)
+pnpm test:ui      # Playwright UI flow against the real frontend
 ```
+
+`pnpm test:ui` needs Chromium once:
+
+```sh
+pnpm exec playwright install chromium
+```
+
+It serves the real UI under the app's CSP and mocks the Tauri bridge, so it
+covers layout, Markdown rendering, links, snippets and undo without launching
+the desktop app. Native link opening is a manual check.
 
 TypeScript is compiled by `tsc`; there is no bundler and no dev server. `pnpm dev`
 compiles once at startup, so run `pnpm watch` in a second terminal while editing

@@ -80,8 +80,13 @@ export function initMarkdownLinks(): void {
 function postProcess(html: string): string {
   const template = document.createElement("template");
   template.innerHTML = html;
-  for (const anchor of template.content.querySelectorAll<HTMLAnchorElement>("a[href]")) {
-    const href = anchor.getAttribute("href") ?? "";
+  for (const anchor of template.content.querySelectorAll<HTMLAnchorElement>("a")) {
+    const href = anchor.getAttribute("href");
+    if (href === null) {
+      anchor.classList.add("is-disabled-link");
+      anchor.title = "Only http, https and mailto links open";
+      continue;
+    }
     const normalized = normalizeHref(href);
     if (normalized === null) {
       anchor.removeAttribute("href");
