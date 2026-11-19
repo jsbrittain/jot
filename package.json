@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build:ui": "tsc",
+    "build:ui": "tsc && node scripts/vendor.mjs",
     "watch": "tsc --watch",
     "dev": "tauri dev",
     "build": "tauri build",
@@ -12,6 +12,8 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
+    "dompurify": "3.4.18",
+    "marked": "18.2.1",
     "typescript": "^5.6"
   }
 }

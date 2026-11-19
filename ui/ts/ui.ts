@@ -357,6 +357,7 @@ export function beginInlineEdit(
   if (!textEl.isConnected || textEl.querySelector("textarea")) {
     return;
   }
+  const initialHtml = textEl.innerHTML;
   const textarea = document.createElement("textarea");
   textarea.className = "card-edit";
   textarea.value = initial;
@@ -372,20 +373,22 @@ export function beginInlineEdit(
     }
     finished = true;
     const value = textarea.value.trim();
-    let content = initial;
+    let saved = false;
     if (save && value !== "" && value !== initial.trim()) {
       try {
         await onSave(value);
-        content = value;
+        saved = true;
       } catch (error) {
         showError(error);
       }
     }
-    if (textarea.parentNode) {
-      textEl.textContent = content;
-      textarea.replaceWith(textEl);
-    } else {
-      textEl.textContent = content;
+    // On success the caller re-renders the card/row. Otherwise restore the
+    // original rendered HTML; never dump the Markdown source into the view.
+    if (!saved) {
+      textEl.innerHTML = initialHtml;
+      if (textarea.parentNode) {
+        textarea.replaceWith(textEl);
+      }
     }
   };
 

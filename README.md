@@ -40,6 +40,7 @@ pnpm build        # platform installer/bundle in src-tauri/target/release/bundle
 | Action | Key |
 | --- | --- |
 | Pin the selection (or current paragraph) | `Cmd/Ctrl+S` |
+| Toggle page Read/Edit mode | `Cmd/Ctrl+E` |
 | Toggle the board | `Cmd/Ctrl+B` |
 | Search the archive | `Cmd/Ctrl+F` |
 | New page | `Cmd/Ctrl+N` |
@@ -57,6 +58,9 @@ pnpm build        # platform installer/bundle in src-tauri/target/release/bundle
   unsaved-state dialog.
 - Tick a snippet to move it to the collapsed **Done** shelf. Unpin it to remove it
   from the board without deleting it; it remains in the archive.
+- **`to page`** on a card or archive row removes the snippet and inserts its raw
+  text at the page caret, replacing any selection. Focused board cards also accept
+  `p`. Undo restores both the page and the snippet.
 - Drag a card by its handle, or focus it and use `Cmd/Ctrl+Up/Down`.
 - The page and the board scroll independently: the top bars, project chips, footer
   and Done shelf stay put while the text and the snippet list scroll.
@@ -64,6 +68,11 @@ pnpm build        # platform installer/bundle in src-tauri/target/release/bundle
   resets it, or focus it and use `←`/`→`, `Home`/`End`.
 - Projects are flat labels. A snippet can have one, or none — that is Inbox.
   Deleting a project keeps its snippets and makes them unlabelled.
+- `Cmd/Ctrl+E` switches the page between **Edit** (the Markdown source) and
+  **Read** (rendered Markdown). Links are clickable in Read mode and on cards and
+  archive rows; they open in the default browser. Clicking non-link text in a card
+  or archive row edits its source. `Cmd/Ctrl+S` in Read mode returns to Edit rather
+  than pinning.
 - `Cmd/Ctrl+F` opens the archive: case-insensitive search over snippet text,
   project filter, include-done toggle, and project management.
 - Pages are rolling and disposable. `Cmd/Ctrl+N` archives the current page if it
@@ -81,8 +90,9 @@ One SQLite database in the platform application data directory:
 | Linux | `~/.local/share/dev.jsb.snippets/snippets.db` |
 
 Timestamps are stored as RFC 3339 UTC and rendered in local time. Snippets are
-plain text (Markdown-friendly, not rendered). Because the database runs in WAL
-mode, back up the whole directory rather than only `snippets.db`.
+stored as plain Markdown source; search matches that source, and rendering is only
+a view. Because the database runs in WAL mode, back up the whole directory rather
+than only `snippets.db`.
 
 Deletes are soft: the row is retained with a `deleted_at` timestamp, and Undo
 restores it. There is no Trash view yet.
@@ -102,6 +112,14 @@ restores it. There is no Trash view yet.
   and a project id, nothing else.
 - **Undo is explicit.** Replacing the textarea value clears the webview's native
   undo stack, so a commit is undone through the app-level toast action.
+- **Markdown is a view, not a format.** The database and the textarea keep the
+  source; Read mode, cards and archive rows render sanitized HTML. Images are not
+  rendered and remote resources are not loaded.
+- **Links are validated twice.** The frontend sanitizes and normalizes links; the
+  Rust `open_external_link` command accepts only `http`, `https` and `mailto` and
+  hands the URL to the OS. Links never navigate the app view.
+- **No bundler.** `marked` and `DOMPurify` are pinned devDependencies copied into
+  `ui/vendor` by `build:ui`. See `THIRD_PARTY.md`.
 
 ## License
 

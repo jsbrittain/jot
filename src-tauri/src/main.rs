@@ -124,6 +124,8 @@ fn run() {
             commands::open_page,
             commands::commit_snippet,
             commands::undo_commit,
+            commands::extract_item_to_page,
+            commands::undo_extract_item_to_page,
             commands::update_item,
             commands::set_done,
             commands::set_pinned,
@@ -135,6 +137,7 @@ fn run() {
             commands::create_project,
             commands::rename_project,
             commands::delete_project,
+            commands::open_external_link,
             commands::hide_window,
             commands::quit_now,
         ])

@@ -11,6 +11,7 @@ import {
   state,
   upsertItem,
 } from "./state.js";
+import { renderItemMarkdown } from "./markdown.js";
 import {
   beginInlineEdit,
   el,
@@ -78,6 +79,10 @@ function onListClick(event: MouseEvent): void {
     return;
   }
 
+  if (target.closest("a[href]")) {
+    return;
+  }
+
   const action = target.closest<HTMLElement>("[data-action]");
   if (action) {
     switch (action.dataset.action) {
@@ -89,6 +94,9 @@ function onListClick(event: MouseEvent): void {
         return;
       case "project":
         startReassign(action, item.id, item.projectId);
+        return;
+      case "to-page":
+        requestReturn(id);
         return;
       default:
         return;
@@ -130,6 +138,9 @@ function onListKeyDown(event: KeyboardEvent): void {
     if (text) {
       startEdit(item.id, text);
     }
+  } else if (event.key === "p") {
+    event.preventDefault();
+    requestReturn(id);
   }
 }
 
@@ -246,18 +257,23 @@ function makeCard(item: Item, done: boolean): HTMLLIElement {
 
   const actions = document.createElement("span");
   actions.className = "card-actions";
+  const toPage = document.createElement("button");
+  toPage.type = "button";
+  toPage.dataset.action = "to-page";
+  toPage.textContent = "to page";
+  toPage.title = "Return this text to the page at the caret";
   const unpin = document.createElement("button");
   unpin.type = "button";
   unpin.dataset.action = "unpin";
   unpin.textContent = "unpin";
   unpin.title = "Remove from the board, keep in the archive";
-  actions.append(unpin);
+  actions.append(toPage, unpin);
 
   meta.append(time, project, actions);
 
   const text = document.createElement("div");
-  text.className = "card-text";
-  text.textContent = item.content;
+  text.className = "card-text markdown";
+  text.innerHTML = renderItemMarkdown(item);
   text.title = "Click to edit";
 
   body.append(meta, text);
@@ -273,6 +289,12 @@ function makeCard(item: Item, done: boolean): HTMLLIElement {
 
   card.append(tick, body, drag);
   return card;
+}
+
+function requestReturn(id: number): void {
+  document.dispatchEvent(
+    new CustomEvent<number>("snippets:return-to-page", { detail: id }),
+  );
 }
 
 async function toggleDone(id: number): Promise<void> {

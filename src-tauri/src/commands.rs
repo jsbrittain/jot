@@ -2,6 +2,7 @@ use std::sync::atomic::Ordering;
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
+use url::Url;
 
 use crate::db::{self, Item, Page, PageSummary, Project};
 use crate::AppState;
@@ -23,6 +24,12 @@ pub struct Bootstrap {
 pub struct CommitResult {
     item: Item,
     page: Page,
+}
+
+#[derive(Serialize)]
+pub struct ExtractResult {
+    page: Page,
+    item: Item,
 }
 
 /// Everything the window needs in one round trip.
@@ -138,6 +145,54 @@ pub fn undo_commit(
     db::undo_commit(&mut conn, item_id, &page_content_before, expected_revision)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "Could not undo: the page or snippet has changed".into())
+}
+
+#[tauri::command]
+pub fn extract_item_to_page(
+    state: State<'_, AppState>,
+    item_id: i64,
+    page_id: i64,
+    page_content: String,
+    expected_revision: i64,
+) -> Result<ExtractResult, String> {
+    if page_content.len() > MAX_PAGE_BYTES {
+        return Err("This page is too large to save".into());
+    }
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    let (page, item) = db::extract_item_to_page(
+        &mut conn,
+        item_id,
+        page_id,
+        &page_content,
+        expected_revision,
+    )
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "Could not return that snippet; the page or snippet changed".to_string())?;
+    Ok(ExtractResult { page, item })
+}
+
+#[tauri::command]
+pub fn undo_extract_item_to_page(
+    state: State<'_, AppState>,
+    item_id: i64,
+    page_id: i64,
+    page_content_before: String,
+    expected_revision: i64,
+) -> Result<ExtractResult, String> {
+    if page_content_before.len() > MAX_PAGE_BYTES {
+        return Err("This page is too large to save".into());
+    }
+    let mut conn = state.db.lock().map_err(|e| e.to_string())?;
+    let (page, item) = db::undo_extract_item_to_page(
+        &mut conn,
+        item_id,
+        page_id,
+        &page_content_before,
+        expected_revision,
+    )
+    .map_err(|e| e.to_string())?
+    .ok_or_else(|| "Could not undo: the page has changed".to_string())?;
+    Ok(ExtractResult { page, item })
 }
 
 #[tauri::command]
@@ -279,6 +334,21 @@ pub fn delete_project(state: State<'_, AppState>, id: i64) -> Result<(), String>
 
 /* -------------------------------------------------------------------- shell */
 
+/// Only schemes that are safe to hand to the OS browser.
+pub fn validate_external_url(input: &str) -> Result<Url, String> {
+    let parsed = Url::parse(input.trim()).map_err(|_| "That is not a valid link".to_string())?;
+    match parsed.scheme() {
+        "http" | "https" | "mailto" => Ok(parsed),
+        _ => Err("Only http, https and mailto links can open".into()),
+    }
+}
+
+#[tauri::command]
+pub fn open_external_link(url: String) -> Result<(), String> {
+    let parsed = validate_external_url(&url)?;
+    opener::open(parsed.as_str()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn hide_window(app: AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -291,4 +361,41 @@ pub fn hide_window(app: AppHandle) {
 pub fn quit_now(app: AppHandle, state: State<'_, AppState>) {
     state.force_exit.store(true, Ordering::SeqCst);
     app.exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_external_url;
+
+    #[test]
+    fn accepts_safe_external_links() {
+        for url in [
+            "https://example.com",
+            "http://example.com/path?q=1",
+            "mailto:someone@example.com",
+        ] {
+            assert!(
+                validate_external_url(url).is_ok(),
+                "{url} should be allowed"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_unsafe_or_relative_links() {
+        for url in [
+            "javascript:alert(1)",
+            "file:///etc/passwd",
+            "data:text/html,hello",
+            "ftp://example.com",
+            "www.example.com",
+            "not a url",
+            "",
+        ] {
+            assert!(
+                validate_external_url(url).is_err(),
+                "{url} should be rejected"
+            );
+        }
+    }
 }

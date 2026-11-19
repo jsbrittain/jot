@@ -1,20 +1,26 @@
-import { api } from "./api.js";
-import { initState } from "./state.js";
+import { api, type Item } from "./api.js";
+import { findItem, getPage, initState, removeItem, upsertItem } from "./state.js";
 import {
   el,
   initUi,
   isModalOpen,
   showError,
+  toast,
   undoToast,
 } from "./ui.js";
 import {
+  applyPage,
   beginCommit,
   cancelCommit,
   flushSave,
   focusPage,
   initPage,
   isCommitOpen,
+  isReadMode,
   newPage,
+  pageSnapshot,
+  setReadMode,
+  toggleReadMode,
 } from "./page.js";
 import {
   initBoard,
@@ -28,10 +34,13 @@ import {
   initArchive,
   openArchive,
   openPages,
+  refreshArchive,
 } from "./archive.js";
+import { initMarkdownLinks } from "./markdown.js";
 
 async function start(): Promise<void> {
   initUi();
+  initMarkdownLinks();
 
   const data = await api.bootstrap();
   initState(data.page, data.projects, data.board, data.lastProjectId);
@@ -49,11 +58,6 @@ async function start(): Promise<void> {
 }
 
 function wireShell(): void {
-  const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
-  el<HTMLSpanElement>("#hint").textContent = isMac
-    ? "⌘S snippet · ⌘B board · ⌘F archive"
-    : "Ctrl+S snippet · Ctrl+B board · Ctrl+F archive";
-
   el<HTMLButtonElement>("#toggle-board").addEventListener("click", () => {
     toggleBoard();
   });
@@ -64,8 +68,18 @@ function wireShell(): void {
     void openPages();
   });
 
+  document.addEventListener("snippets:return-to-page", (event) => {
+    const id = (event as CustomEvent<number>).detail;
+    const item = findItem(id);
+    if (!item) {
+      showError("That snippet no longer exists");
+      return;
+    }
+    void returnItemToPage(item);
+  });
+
   void api.onShown(() => {
-    focusPage();
+    focusPage(true);
   }).catch(showError);
   void api.onFlushQuit(() => {
     void (async () => {
@@ -93,6 +107,60 @@ function overlayOpen(): boolean {
   return !el<HTMLDivElement>("#archive").hidden || !el<HTMLDivElement>("#pages").hidden;
 }
 
+async function returnItemToPage(item: Item): Promise<void> {
+  const archiveOpen = !el<HTMLDivElement>("#archive").hidden;
+  cancelCommit();
+  setReadMode(false, !archiveOpen);
+  try {
+    await flushSave();
+    const snapshot = pageSnapshot();
+    const page = getPage();
+    const after =
+      snapshot.value.slice(0, snapshot.start) +
+      item.content +
+      snapshot.value.slice(snapshot.end);
+    const result = await api.extractToPage(item.id, page.id, after, page.revision);
+    const caret = snapshot.start + item.content.length;
+
+    applyPage(result.page, !archiveOpen, caret);
+    removeItem(item.id);
+    renderBoard();
+    refreshArchive();
+
+    toast("Returned to page", {
+      undo: async () => {
+        const current = getPage();
+        const snapshotNow = pageSnapshot();
+        if (
+          current.revision !== result.page.revision ||
+          snapshotNow.value !== result.page.content
+        ) {
+          const restored = await api.restoreItem(item.id);
+          upsertItem(restored);
+          renderBoard();
+          refreshArchive();
+          toast("Snippet restored; the page had changed");
+          return;
+        }
+        const undone = await api.undoExtractFromPage(
+          item.id,
+          page.id,
+          snapshot.value,
+          result.page.revision,
+        );
+        const focus = el<HTMLDivElement>("#archive").hidden;
+        applyPage(undone.page, focus, snapshot.start);
+        upsertItem(undone.item);
+        renderBoard();
+        refreshArchive();
+        toast("Return undone");
+      },
+    });
+  } catch (error) {
+    showError(error);
+  }
+}
+
 function wireKeys(): void {
   document.addEventListener("keydown", (event) => {
     if (isModalOpen()) {
@@ -103,8 +171,20 @@ function wireKeys(): void {
 
     if (mod && key === "s") {
       event.preventDefault();
+      if (isReadMode()) {
+        setReadMode(false);
+        return;
+      }
       if (!isCommitOpen() && !overlayOpen()) {
         beginCommit();
+      }
+      return;
+    }
+
+    if (mod && key === "e") {
+      event.preventDefault();
+      if (!overlayOpen()) {
+        toggleReadMode();
       }
       return;
     }
@@ -152,13 +232,18 @@ function wireKeys(): void {
     }
 
     if (key === "escape") {
+      if (closeOverlays()) {
+        event.preventDefault();
+        return;
+      }
+      if (isReadMode()) {
+        event.preventDefault();
+        setReadMode(false);
+        return;
+      }
       if (isCommitOpen()) {
         event.preventDefault();
         cancelCommit();
-        return;
-      }
-      if (closeOverlays()) {
-        event.preventDefault();
         return;
       }
       event.preventDefault();

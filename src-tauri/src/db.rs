@@ -357,6 +357,12 @@ pub fn get_item(conn: &Connection, id: i64) -> Result<Option<Item>> {
     .optional()
 }
 
+/// Fetch an item even if it is soft-deleted. Used by undo paths.
+pub fn get_item_any(conn: &Connection, id: i64) -> Result<Option<Item>> {
+    conn.query_row(&format!("{ITEM_QUERY} WHERE i.id = ?1"), [id], row_to_item)
+        .optional()
+}
+
 /// Commit a snippet and update the page in one transaction. Returns `None`
 /// when the page revision is stale; on `None` nothing has been written.
 pub fn commit_snippet(
@@ -450,6 +456,82 @@ pub fn undo_commit(
     tx.execute("DELETE FROM items WHERE id = ?1", [item_id])?;
     tx.commit()?;
     page_by_id(conn, page_id).map(Some)
+}
+
+/// Move a snippet's text back to the page and soft-delete the snippet in one
+/// transaction. Returns `None` when the page revision changed or the item is
+/// missing; nothing is written in that case.
+pub fn extract_item_to_page(
+    conn: &mut Connection,
+    item_id: i64,
+    page_id: i64,
+    page_content: &str,
+    expected_revision: i64,
+) -> Result<Option<(Page, Item)>> {
+    let Some(item) = get_item(conn, item_id)? else {
+        return Ok(None);
+    };
+    let timestamp = now();
+    let tx = conn.transaction()?;
+    let changed = tx.execute(
+        "UPDATE pages
+            SET content = ?2, updated_at = ?3, revision = revision + 1
+          WHERE id = ?1 AND revision = ?4 AND archived_at IS NULL",
+        params![page_id, page_content, timestamp, expected_revision],
+    )?;
+    if changed == 0 {
+        tx.rollback()?;
+        return Ok(None);
+    }
+    let deleted = tx.execute(
+        "UPDATE items SET deleted_at = ?2 WHERE id = ?1 AND deleted_at IS NULL",
+        params![item_id, timestamp],
+    )?;
+    if deleted == 0 {
+        tx.rollback()?;
+        return Ok(None);
+    }
+    tx.commit()?;
+    let page = page_by_id(conn, page_id)?;
+    Ok(Some((page, item)))
+}
+
+/// Reverse `extract_item_to_page`: restore the page and un-delete the snippet
+/// together. Returns `None` when the page revision changed.
+pub fn undo_extract_item_to_page(
+    conn: &mut Connection,
+    item_id: i64,
+    page_id: i64,
+    page_content_before: &str,
+    expected_revision: i64,
+) -> Result<Option<(Page, Item)>> {
+    if get_item_any(conn, item_id)?.is_none() {
+        return Ok(None);
+    }
+    let timestamp = now();
+    let tx = conn.transaction()?;
+    let changed = tx.execute(
+        "UPDATE pages
+            SET content = ?2, updated_at = ?3, revision = revision + 1
+          WHERE id = ?1 AND revision = ?4 AND archived_at IS NULL",
+        params![page_id, page_content_before, timestamp, expected_revision],
+    )?;
+    if changed == 0 {
+        tx.rollback()?;
+        return Ok(None);
+    }
+    let restored = tx.execute(
+        "UPDATE items SET deleted_at = NULL WHERE id = ?1 AND deleted_at IS NOT NULL",
+        [item_id],
+    )?;
+    if restored == 0 {
+        tx.rollback()?;
+        return Ok(None);
+    }
+    tx.commit()?;
+    let page = page_by_id(conn, page_id)?;
+    let item = get_item(conn, item_id)?.expect("restored item must exist");
+    Ok(Some((page, item)))
 }
 
 /// Replace a snippet's text. `created_at` never changes.
@@ -777,6 +859,128 @@ mod tests {
             "the snippet was edited"
         );
         assert!(get_item(&conn, item.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn extracting_a_snippet_updates_the_page_and_removes_it() {
+        let mut conn = memory_db();
+        let rqa = create_project(&conn, "RQA").unwrap();
+        let page = current_page(&conn).unwrap();
+        save_page(&conn, page.id, "alpha bravo", page.revision)
+            .unwrap()
+            .unwrap();
+        let page = current_page(&conn).unwrap();
+        let (item, after_commit) = commit_snippet(
+            &mut conn,
+            page.id,
+            "alpha ",
+            "bravo",
+            Some(rqa.id),
+            page.revision,
+        )
+        .unwrap()
+        .unwrap();
+        set_done(&conn, item.id, true).unwrap();
+        let before = get_item(&conn, item.id).unwrap().unwrap();
+
+        let (page, returned) = extract_item_to_page(
+            &mut conn,
+            item.id,
+            after_commit.id,
+            "alpha bravo",
+            after_commit.revision,
+        )
+        .unwrap()
+        .expect("extract");
+
+        assert_eq!(page.content, "alpha bravo");
+        assert_eq!(page.revision, after_commit.revision + 1);
+        assert_eq!(returned.content, "bravo");
+        assert_eq!(returned.project_id, Some(rqa.id));
+        assert_eq!(returned.done_at, before.done_at);
+        assert_eq!(returned.created_at, before.created_at);
+        assert!(get_item(&conn, item.id).unwrap().is_none());
+        assert!(query_items(&conn, true, None, false, true, None)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn extract_with_a_stale_revision_writes_nothing() {
+        let mut conn = memory_db();
+        let (item, page) = commit(&mut conn, "text", None);
+        let newer = save_page(&conn, page.id, "newer", page.revision)
+            .unwrap()
+            .unwrap();
+
+        assert!(
+            extract_item_to_page(&mut conn, item.id, page.id, "newer text", page.revision)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(page_by_id(&conn, page.id).unwrap().content, "newer");
+        assert_eq!(newer.revision, page.revision + 1);
+        assert!(get_item(&conn, item.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn extract_missing_item_writes_nothing() {
+        let mut conn = memory_db();
+        let page = current_page(&conn).unwrap();
+
+        assert!(
+            extract_item_to_page(&mut conn, 404, page.id, "text", page.revision)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(page_by_id(&conn, page.id).unwrap().content, "");
+    }
+
+    #[test]
+    fn undo_extract_restores_the_page_and_snippet() {
+        let mut conn = memory_db();
+        let (item, page) = commit(&mut conn, "text", None);
+        let (extracted_page, _) =
+            extract_item_to_page(&mut conn, item.id, page.id, "text", page.revision)
+                .unwrap()
+                .unwrap();
+
+        let (restored_page, restored_item) =
+            undo_extract_item_to_page(&mut conn, item.id, page.id, "", extracted_page.revision)
+                .unwrap()
+                .expect("undo");
+
+        assert_eq!(restored_page.content, "");
+        assert_eq!(restored_item.id, item.id);
+        assert_eq!(restored_item.content, item.content);
+        assert_eq!(restored_item.project_id, item.project_id);
+        assert!(get_item(&conn, item.id).unwrap().is_some());
+    }
+
+    #[test]
+    fn undo_extract_refuses_after_a_page_write() {
+        let mut conn = memory_db();
+        let (item, page) = commit(&mut conn, "text", None);
+        let (extracted_page, _) =
+            extract_item_to_page(&mut conn, item.id, page.id, "text", page.revision)
+                .unwrap()
+                .unwrap();
+        let typed = save_page(&conn, page.id, "typed", extracted_page.revision)
+            .unwrap()
+            .unwrap();
+
+        assert!(undo_extract_item_to_page(
+            &mut conn,
+            item.id,
+            page.id,
+            "",
+            extracted_page.revision
+        )
+        .unwrap()
+        .is_none());
+        assert_eq!(page_by_id(&conn, page.id).unwrap().content, "typed");
+        assert_eq!(typed.revision, extracted_page.revision + 1);
+        assert!(get_item(&conn, item.id).unwrap().is_none());
     }
 
     #[test]

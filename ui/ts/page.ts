@@ -9,6 +9,7 @@ import {
   state,
 } from "./state.js";
 import { renderBoard } from "./board.js";
+import { renderMarkdown } from "./markdown.js";
 import {
   el,
   hideToast,
@@ -19,6 +20,8 @@ import {
 } from "./ui.js";
 
 const pageInput = el<HTMLTextAreaElement>("#page");
+const pageRendered = el<HTMLElement>("#page-rendered");
+const toggleRead = el<HTMLButtonElement>("#toggle-read");
 const saveStatus = el<HTMLSpanElement>("#save-status");
 const commitBar = el<HTMLDivElement>("#commit-bar");
 const commitPreview = el<HTMLDivElement>("#commit-preview");
@@ -42,6 +45,8 @@ let pending: PendingCommit | null = null;
 let suggestions: Suggestion[] = [];
 let suggestionIndex = 0;
 let committing = false;
+let readMode = false;
+let savedSelection = { start: 0, end: 0 };
 
 let saveTimer: number | undefined;
 let saveQueue: Promise<void> = Promise.resolve();
@@ -85,12 +90,80 @@ export function initPage(): void {
   el<HTMLButtonElement>("#new-page").addEventListener("click", () => {
     void newPage();
   });
+  toggleRead.addEventListener("click", () => {
+    setReadMode(!readMode);
+  });
+  updateHint();
 }
 
-export function focusPage(): void {
+export function focusPage(preserveCaret = false): void {
+  if (readMode) {
+    pageRendered.focus();
+    return;
+  }
   pageInput.focus();
-  const end = pageInput.value.length;
-  pageInput.setSelectionRange(end, end);
+  if (!preserveCaret) {
+    const end = pageInput.value.length;
+    pageInput.setSelectionRange(end, end);
+  }
+}
+
+export function isReadMode(): boolean {
+  return readMode;
+}
+
+export function setReadMode(enabled: boolean, focus = true): void {
+  if (enabled === readMode) {
+    if (enabled && focus) {
+      pageRendered.focus();
+    }
+    return;
+  }
+  if (enabled) {
+    cancelCommit();
+    savedSelection = { start: pageInput.selectionStart, end: pageInput.selectionEnd };
+    readMode = true;
+    pageInput.hidden = true;
+    pageRendered.hidden = false;
+    pageRendered.innerHTML = renderMarkdown(pageInput.value);
+    toggleRead.textContent = "Edit";
+    toggleRead.setAttribute("aria-pressed", "true");
+    toggleRead.title = "Edit the page";
+    updateHint();
+    if (focus) {
+      pageRendered.focus();
+    }
+  } else {
+    readMode = false;
+    pageRendered.hidden = true;
+    pageInput.hidden = false;
+    toggleRead.textContent = "Read";
+    toggleRead.setAttribute("aria-pressed", "false");
+    toggleRead.title = "Read view";
+    updateHint();
+    if (focus) {
+      pageInput.focus();
+      const limit = pageInput.value.length;
+      const start = Math.min(savedSelection.start, limit);
+      const end = Math.min(savedSelection.end, limit);
+      pageInput.setSelectionRange(start, end);
+    }
+  }
+}
+
+export function toggleReadMode(): void {
+  setReadMode(!readMode);
+}
+
+function updateHint(): void {
+  const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+  el<HTMLSpanElement>("#hint").textContent = isMac
+    ? readMode
+      ? "⌘E edit · Esc edit · links open in browser"
+      : "⌘S snippet · ⌘E read · ⌘B board · ⌘F archive"
+    : readMode
+      ? "Ctrl+E edit · Esc edit · links open in browser"
+      : "Ctrl+S snippet · Ctrl+E read · Ctrl+B board · Ctrl+F archive";
 }
 
 export function isCommitOpen(): boolean {
@@ -139,16 +212,44 @@ export function applyPage(page: Page, focus = false, caret?: number): void {
   setPage(page);
   pageInput.value = page.content;
   el<HTMLSpanElement>("#page-date").textContent = longToday();
-  if (focus) {
-    pageInput.focus();
-    const position = caret ?? page.content.length;
+  if (readMode) {
+    const position =
+      caret === undefined ? page.content.length : Math.min(Math.max(caret, 0), page.content.length);
     pageInput.setSelectionRange(position, position);
+    savedSelection = { start: position, end: position };
+    pageRendered.innerHTML = renderMarkdown(page.content);
+    if (focus) {
+      pageRendered.focus();
+    }
+  } else {
+    if (caret !== undefined) {
+      const position = Math.min(Math.max(caret, 0), page.content.length);
+      pageInput.setSelectionRange(position, position);
+    }
+    if (focus) {
+      pageInput.focus();
+      if (caret === undefined) {
+        const end = page.content.length;
+        pageInput.setSelectionRange(end, end);
+      }
+    }
   }
   setStatus(`Saved ${timeLabel(page.updatedAt)}`);
 }
 
+export function pageSnapshot(): { value: string; start: number; end: number } {
+  return {
+    value: pageInput.value,
+    start: pageInput.selectionStart,
+    end: pageInput.selectionEnd,
+  };
+}
+
 export async function newPage(): Promise<void> {
   cancelCommit();
+  if (readMode) {
+    setReadMode(false, false);
+  }
   try {
     await flushSave();
     const page = await api.newPage();
@@ -424,6 +525,10 @@ async function confirmCommit(): Promise<void> {
 
     toast(`Pinned to ${projectName(item.projectId)}`, {
       undo: async () => {
+        if (pageInput.value !== result.page.content) {
+          showError("The page has changed; the pin was not undone");
+          return;
+        }
         const restored = await api.undoCommit(item.id, before, revision);
         applyPage(restored, true, caret);
         removeItem(item.id);

@@ -45,6 +45,11 @@ export interface CommitResult {
   page: Page;
 }
 
+export interface ExtractResult {
+  page: Page;
+  item: Item;
+}
+
 export interface ItemQuery {
   archive: boolean;
   projectId: number | null;
@@ -109,6 +114,31 @@ export const api = {
       expectedRevision,
     }),
 
+  extractToPage: (
+    itemId: number,
+    pageId: number,
+    pageContent: string,
+    expectedRevision: number,
+  ) =>
+    tauri().core.invoke<ExtractResult>("extract_item_to_page", {
+      itemId,
+      pageId,
+      pageContent,
+      expectedRevision,
+    }),
+  undoExtractFromPage: (
+    itemId: number,
+    pageId: number,
+    pageContentBefore: string,
+    expectedRevision: number,
+  ) =>
+    tauri().core.invoke<ExtractResult>("undo_extract_item_to_page", {
+      itemId,
+      pageId,
+      pageContentBefore,
+      expectedRevision,
+    }),
+
   updateItem: (id: number, content: string) =>
     tauri().core.invoke<Item>("update_item", { id, content }),
   setDone: (id: number, done: boolean) =>
@@ -139,6 +169,8 @@ export const api = {
 
   hide: () => tauri().core.invoke<void>("hide_window"),
   quit: () => tauri().core.invoke<void>("quit_now"),
+  openExternalLink: (url: string) =>
+    tauri().core.invoke<void>("open_external_link", { url }),
 
   onShown: (handler: () => void) => tauri().event.listen<void>("shown", handler),
   onFlushQuit: (handler: () => void) =>

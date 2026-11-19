@@ -1,6 +1,7 @@
 import { api, type Item, type PageSummary } from "./api.js";
 import { applyPage, cancelCommit, flushSave, focusPage, newPage } from "./page.js";
 import { renderBoard } from "./board.js";
+import { renderItemMarkdown } from "./markdown.js";
 import {
   filterKey,
   parseFilterKey,
@@ -117,7 +118,14 @@ export async function openArchive(): Promise<void> {
 
 export function closeArchive(): void {
   el<HTMLDivElement>("#archive").hidden = true;
-  focusPage();
+  focusPage(true);
+}
+
+/// Re-query the archive if it is open. Used after an item leaves or returns.
+export function refreshArchive(): void {
+  if (!el<HTMLDivElement>("#archive").hidden) {
+    void loadArchive();
+  }
 }
 
 export function closeOverlays(): boolean {
@@ -235,8 +243,8 @@ function makeArchiveRow(item: Item): HTMLElement {
   main.className = "archive-body-main";
 
   const text = document.createElement("div");
-  text.className = "archive-text";
-  text.textContent = item.content;
+  text.className = "archive-text markdown";
+  text.innerHTML = renderItemMarkdown(item);
   text.title = "Click to edit";
 
   const meta = document.createElement("div");
@@ -273,13 +281,19 @@ function makeArchiveRow(item: Item): HTMLElement {
   pin.textContent = item.pinned ? "unpin" : "pin";
   pin.title = item.pinned ? "Remove from the board" : "Put on the board";
 
+  const toPage = document.createElement("button");
+  toPage.type = "button";
+  toPage.dataset.action = "to-page";
+  toPage.textContent = "to page";
+  toPage.title = "Return this text to the page at the caret";
+
   const remove = document.createElement("button");
   remove.type = "button";
   remove.dataset.action = "delete";
   remove.textContent = "delete";
   remove.title = "Delete this snippet";
 
-  actions.append(pin, remove);
+  actions.append(pin, toPage, remove);
   row.append(tick, time, main, actions);
   return row;
 }
@@ -302,6 +316,10 @@ function onArchiveClick(event: MouseEvent): void {
     return;
   }
 
+  if (target.closest("a[href]")) {
+    return;
+  }
+
   const action = target.closest<HTMLElement>("[data-action]");
   if (action) {
     switch (action.dataset.action) {
@@ -313,6 +331,11 @@ function onArchiveClick(event: MouseEvent): void {
         return;
       case "delete":
         void deleteItem(item.id);
+        return;
+      case "to-page":
+        document.dispatchEvent(
+          new CustomEvent<number>("snippets:return-to-page", { detail: id }),
+        );
         return;
       default:
         return;
@@ -554,7 +577,7 @@ export async function openPages(): Promise<void> {
 
 export function closePages(): void {
   el<HTMLDivElement>("#pages").hidden = true;
-  focusPage();
+  focusPage(true);
 }
 
 async function loadPages(): Promise<void> {
