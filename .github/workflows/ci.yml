@@ -56,12 +56,6 @@ jobs:
       - name: Type-check the frontend
         run: pnpm build:ui
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: UI tests
-        run: pnpm test:ui
-
       - name: Check formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
@@ -70,6 +64,30 @@ jobs:
 
       - name: Test
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  ui-test:
+    name: UI tests
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.5.1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
+      - name: UI tests
+        run: pnpm test:ui
 
   build:
     name: Build (${{ matrix.os }})

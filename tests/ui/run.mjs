@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../ui");
+const MOD = process.platform === "darwin" ? "Meta" : "Control";
 
 const MOCK = `(() => {
   const now = () => new Date().toISOString();
@@ -333,7 +334,7 @@ async function main() {
     textarea.focus();
     textarea.setSelectionRange(6, 11);
   });
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
   await page.waitForSelector("#commit-bar:not([hidden])");
   assert.equal(await page.locator("#commit-preview").textContent(), "bravo");
   assert.equal(await page.locator("#commit-project").inputValue(), "");
@@ -350,7 +351,7 @@ async function main() {
   await page.screenshot({ path: "/tmp/snippets-ui-page.png", fullPage: true });
 
   // Undo the pin.
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(`${MOD}+z`);
   await page.waitForTimeout(300);
   assert.equal(await page.locator("#page").inputValue(), "alpha bravo\ncharlie delta");
   assert.equal(await page.locator("#board-list .card").count(), 0);
@@ -361,8 +362,8 @@ async function main() {
     textarea.focus();
     textarea.setSelectionRange(6, 11);
   });
-  await page.keyboard.press("Meta+s");
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
+  await page.keyboard.press(`${MOD}+s`);
   await page.waitForTimeout(300);
   await page.locator("#board-list .card .tick").click();
   await page.waitForTimeout(200);
@@ -378,7 +379,7 @@ async function main() {
   assert.equal(await page.locator("#page").inputValue(), "alpha bravo\ncharlie delta");
   assert.equal(await page.locator("#done-shelf").isHidden(), true);
   assert.equal(await page.locator("#toast-text").textContent(), "Returned to page");
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(`${MOD}+z`);
   await page.waitForTimeout(350);
   assert.equal(await page.locator("#page").inputValue(), "alpha \ncharlie delta");
   assert.equal(await page.locator("#done-list .card").count(), 1);
@@ -391,7 +392,7 @@ async function main() {
   assert.equal(await page.locator("#toast-text").textContent(), "Unpinned");
 
   // Archive search.
-  await page.keyboard.press("Meta+f");
+  await page.keyboard.press(`${MOD}+f`);
   await page.waitForSelector("#archive:not([hidden])");
   await page.waitForTimeout(350);
   assert.equal(await page.locator(".archive-text").first().textContent().then((text) => text?.trim()), "bravo");
@@ -416,7 +417,7 @@ async function main() {
     textarea.focus();
     textarea.setSelectionRange(7, 20);
   });
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
   await page.locator("#commit-project").fill("RQA");
   await page.waitForTimeout(100);
   assert.equal(await page.locator(".suggest li.is-create").count(), 1);
@@ -430,7 +431,7 @@ async function main() {
   // Inline edit.
   await page.locator("#board-list .card-text").first().click();
   await page.locator("#board-list .card-edit").fill("charlie delta edited");
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
   await page.waitForTimeout(300);
   assert.equal(await page.locator("#board-list .card-text").first().textContent().then((text) => text?.trim()), "charlie delta edited");
 
@@ -441,7 +442,7 @@ async function main() {
     textarea.focus();
     textarea.setSelectionRange(6, 10);
   });
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
   await page.waitForSelector("#commit-bar:not([hidden])");
   assert.equal(await page.locator("#commit-project").inputValue(), "");
   assert.equal(await page.locator("#commit-confirm").textContent(), "Pin to Inbox");
@@ -455,7 +456,7 @@ async function main() {
   assert.equal(await page.locator("#board-list .card-project").first().textContent(), "RQA");
 
   // Project manager rename and delete.
-  await page.keyboard.press("Meta+f");
+  await page.keyboard.press(`${MOD}+f`);
   await page.waitForTimeout(300);
   await page.locator("#manage-projects").click();
   assert.equal(await page.locator("#project-list li").count(), 1);
@@ -464,10 +465,10 @@ async function main() {
   await page.waitForTimeout(150);
 
   // New page and page picker.
-  await page.keyboard.press("Meta+n");
+  await page.keyboard.press(`${MOD}+n`);
   await page.waitForTimeout(350);
   assert.equal(await page.locator("#page").inputValue(), "");
-  await page.keyboard.press("Meta+p");
+  await page.keyboard.press(`${MOD}+p`);
   await page.waitForSelector("#pages:not([hidden])");
   await page.waitForTimeout(300);
   assert.equal(await page.locator(".page-row").count(), 2);
@@ -488,7 +489,7 @@ async function main() {
   assert.equal(await page.locator("#page").inputValue(), "delta echo");
   assert.equal(await page.locator("#board-count").textContent(), "1");
   assert.equal(await page.locator("#toast-text").textContent(), "Returned to page");
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(`${MOD}+z`);
   await page.waitForTimeout(350);
   assert.equal(await page.locator("#page").inputValue(), "delta ");
   assert.equal(await page.locator("#board-count").textContent(), "2");
@@ -499,7 +500,7 @@ async function main() {
     element.focus();
     element.setSelectionRange(0, 0);
   });
-  await page.keyboard.press("Meta+f");
+  await page.keyboard.press(`${MOD}+f`);
   await page.waitForSelector("#archive:not([hidden])");
   await page.waitForTimeout(300);
   await page.locator("#archive-body .archive-row").first().hover();
@@ -516,7 +517,7 @@ async function main() {
     4,
     "closing the archive should preserve the insertion caret",
   );
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(`${MOD}+z`);
   await page.waitForTimeout(400);
   assert.equal(await page.locator("#page").inputValue(), "delta ");
   assert.equal(await page.locator("#board-count").textContent(), "2");
@@ -533,7 +534,7 @@ async function main() {
   await page.waitForTimeout(350);
   assert.equal(await page.locator("#page").inputValue(), "echo right");
   assert.equal(await page.locator("#board-count").textContent(), "1");
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(`${MOD}+z`);
   await page.waitForTimeout(350);
   assert.equal(await page.locator("#page").inputValue(), "left right");
   assert.equal(await page.locator("#board-count").textContent(), "2");
@@ -548,7 +549,7 @@ async function main() {
   await page.waitForTimeout(350);
   assert.equal(await page.locator("#page").inputValue(), "left rightecho");
   await page.locator("#page").fill("left rightecho changed");
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(`${MOD}+z`);
   await page.waitForTimeout(400);
   assert.equal(await page.locator("#page").inputValue(), "left rightecho changed");
   assert.equal(await page.locator("#board-count").textContent(), "2");
@@ -564,13 +565,13 @@ async function main() {
     element.focus();
     element.setSelectionRange(0, element.value.length);
   });
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
   await page.waitForSelector("#commit-bar:not([hidden])");
   await page.keyboard.press("Enter");
   await page.waitForTimeout(350);
   assert.equal(await page.locator("#board-count").textContent(), "3");
   await page.locator("#page").fill("typed after");
-  await page.keyboard.press("Meta+z");
+  await page.keyboard.press(`${MOD}+z`);
   await page.waitForTimeout(300);
   assert.equal(await page.locator("#page").inputValue(), "typed after");
   assert.equal(await page.locator("#board-count").textContent(), "3");
@@ -584,7 +585,7 @@ async function main() {
     "# Heading\n\n**bold** and *italic* and `code`\n\n[OpenAI](https://openai.com) and www.example.com\n\n[www](www.example.com) [bad](javascript:alert(1))\n\n- one\n- two\n\n| A | B |\n| - | - |\n| 1 | 2 |";
   await page.locator("#page").fill(markdownSource);
   await page.waitForTimeout(350);
-  await page.keyboard.press("Meta+e");
+  await page.keyboard.press(`${MOD}+e`);
   await page.waitForTimeout(300);
   assert.equal(await page.locator("#page").isHidden(), true);
   assert.equal(await page.locator("#page-rendered").isVisible(), true);
@@ -615,7 +616,7 @@ async function main() {
   await page.screenshot({ path: "/tmp/snippets-ui-read.png", fullPage: true });
 
   // Cmd+S in Read mode returns to Edit without pinning.
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
   await page.waitForTimeout(200);
   assert.equal(await page.locator("#page").isVisible(), true);
   assert.equal(await page.locator("#commit-bar").isHidden(), true);
@@ -634,7 +635,7 @@ async function main() {
     "<script>window.__pwned=1</script>\n<img src=x onerror=\"window.__pwned=2\">\n<div style=\"color:red\">styled</div>\n<a href=\"javascript:alert(1)\">bad</a>",
   );
   await page.waitForTimeout(300);
-  await page.keyboard.press("Meta+e");
+  await page.keyboard.press(`${MOD}+e`);
   await page.waitForTimeout(300);
   assert.equal(await page.locator("#page-rendered script").count(), 0);
   assert.equal(await page.locator("#page-rendered img").count(), 0);
@@ -648,7 +649,7 @@ async function main() {
     true,
   );
   assert.equal(await page.evaluate(() => window.__pwned), undefined);
-  await page.keyboard.press("Meta+e");
+  await page.keyboard.press(`${MOD}+e`);
   await page.waitForTimeout(200);
 
   // Rendered snippets: links open, non-link text still edits.
@@ -658,7 +659,7 @@ async function main() {
     element.focus();
     element.setSelectionRange(0, element.value.length);
   });
-  await page.keyboard.press("Meta+s");
+  await page.keyboard.press(`${MOD}+s`);
   await page.waitForSelector("#commit-bar:not([hidden])");
   await page.keyboard.press("Enter");
   await page.waitForTimeout(350);
@@ -672,7 +673,7 @@ async function main() {
     "card link should be opened",
   );
   assert.equal(await page.locator("#board-list .card-edit").count(), 0, "link click must not edit");
-  await page.keyboard.press("Meta+f");
+  await page.keyboard.press(`${MOD}+f`);
   await page.waitForTimeout(300);
   assert.equal(await page.locator("#archive-body strong").first().textContent(), "bold");
   await page.keyboard.press("Escape");
@@ -773,7 +774,7 @@ async function main() {
   assert.equal(dateAfter.y, dateBefore.y, "top bar should stay put");
 
   // The rendered Read view scrolls independently too.
-  await layout.keyboard.press("Meta+e");
+  await layout.keyboard.press(`${MOD}+e`);
   await layout.waitForTimeout(250);
   const renderedPage = layout.locator("#page-rendered");
   assert.equal(await renderedPage.isVisible(), true);
@@ -790,7 +791,7 @@ async function main() {
     (await renderedPage.evaluate((element) => element.scrollTop)) > 0,
     "read view should scroll",
   );
-  await layout.keyboard.press("Meta+e");
+  await layout.keyboard.press(`${MOD}+e`);
   await layout.waitForTimeout(200);
 
   // All projects are listed; arrows scroll the picker; Enter uses the highlight.
@@ -798,7 +799,7 @@ async function main() {
     element.focus();
     element.setSelectionRange(0, 5);
   });
-  await layout.keyboard.press("Meta+s");
+  await layout.keyboard.press(`${MOD}+s`);
   await layout.waitForSelector("#commit-bar:not([hidden])");
   assert.equal(await layout.locator("#commit-project").inputValue(), "");
   assert.equal(await layout.locator("#commit-suggest li").count(), 13);
