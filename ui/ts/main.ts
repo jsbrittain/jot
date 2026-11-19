@@ -5,7 +5,6 @@ import {
   initUi,
   isModalOpen,
   showError,
-  toast,
   undoToast,
 } from "./ui.js";
 import {
@@ -50,8 +49,8 @@ async function start(): Promise<void> {
 function wireShell(): void {
   const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
   el<HTMLSpanElement>("#hint").textContent = isMac
-    ? "⌘↵ pin · ⌘B board · ⌘F archive"
-    : "Ctrl+Enter pin · Ctrl+B board · Ctrl+F archive";
+    ? "⌘S snippet · ⌘B board · ⌘F archive"
+    : "Ctrl+S snippet · Ctrl+B board · Ctrl+F archive";
 
   el<HTMLButtonElement>("#toggle-board").addEventListener("click", () => {
     toggleBoard();
@@ -100,7 +99,7 @@ function wireKeys(): void {
     const mod = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
 
-    if (mod && key === "enter") {
+    if (mod && key === "s") {
       event.preventDefault();
       if (!isCommitOpen() && !overlayOpen()) {
         beginCommit();
@@ -136,14 +135,6 @@ function wireKeys(): void {
     if (mod && key === "p") {
       event.preventDefault();
       void openPages();
-      return;
-    }
-
-    if (mod && key === "s") {
-      event.preventDefault();
-      void flushSave()
-        .then(() => toast("Saved"))
-        .catch(showError);
       return;
     }
 

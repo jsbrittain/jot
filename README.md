@@ -39,7 +39,7 @@ pnpm build        # platform installer/bundle in src-tauri/target/release/bundle
 
 | Action | Key |
 | --- | --- |
-| Pin the selection (or current paragraph) | `Cmd/Ctrl+Enter` |
+| Pin the selection (or current paragraph) | `Cmd/Ctrl+S` |
 | Toggle the board | `Cmd/Ctrl+B` |
 | Search the archive | `Cmd/Ctrl+F` |
 | New page | `Cmd/Ctrl+N` |
@@ -48,11 +48,12 @@ pnpm build        # platform installer/bundle in src-tauri/target/release/bundle
 | Close an overlay, or hide the window | `Esc` |
 | Summon the window from another app | `Cmd/Ctrl+Shift+J` |
 
-- Select text and press `Cmd/Ctrl+Enter`: a bar appears with the target project
+- Select text and press `Cmd/Ctrl+S`: a bar appears with the target project
   preselected. `Enter` pins, typing filters projects, `Esc` cancels.
 - Pinning **cuts** the text out of the page. It appears at the top of the board
   with a timestamp. `Cmd/Ctrl+Z`, or Undo in the toast, restores it exactly.
-- The page autosaves. There is no save button and no unsaved-state dialog.
+- The page autosaves. There is no save button, no save shortcut and no
+  unsaved-state dialog.
 - Tick a snippet to move it to the collapsed **Done** shelf. Unpin it to remove it
   from the board without deleting it; it remains in the archive.
 - Drag a card by its handle, or focus it and use `Cmd/Ctrl+Up/Down`.

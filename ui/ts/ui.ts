@@ -395,7 +395,10 @@ export function beginInlineEdit(
       event.preventDefault();
       event.stopPropagation();
       void finish(false);
-    } else if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    } else if (
+      (event.metaKey || event.ctrlKey) &&
+      (event.key === "Enter" || event.key.toLowerCase() === "s")
+    ) {
       event.preventDefault();
       event.stopPropagation();
       void finish(true);

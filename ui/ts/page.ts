@@ -337,6 +337,10 @@ function onCommitKeyDown(event: KeyboardEvent): void {
     event.preventDefault();
     event.stopPropagation();
     void confirmCommit();
+  } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    event.stopPropagation();
+    void confirmCommit();
   } else if (event.key === "Escape") {
     event.preventDefault();
     event.stopPropagation();
