@@ -138,6 +138,7 @@ export async function flushSave(): Promise<void> {
 export function applyPage(page: Page, focus = false, caret?: number): void {
   setPage(page);
   pageInput.value = page.content;
+  el<HTMLSpanElement>("#page-date").textContent = longToday();
   if (focus) {
     pageInput.focus();
     const position = caret ?? page.content.length;

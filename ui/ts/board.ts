@@ -189,7 +189,12 @@ export function renderBoard(): void {
   if (open.length === 0) {
     const empty = document.createElement("li");
     empty.className = "card-empty";
-    empty.textContent = done.length > 0 ? "Nothing open." : "Nothing pinned yet.";
+    empty.textContent =
+      done.length > 0
+        ? "Nothing open."
+        : state.filter === "all"
+          ? "Nothing pinned yet."
+          : "Nothing in this view.";
     list.replaceChildren(empty);
   } else {
     list.replaceChildren(...open.map((item) => makeCard(item, false)));

@@ -251,6 +251,10 @@ export function initUi(): void {
       event.stopPropagation();
       settleModal(false);
     } else if (event.key === "Enter") {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.id === "modal-cancel") {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
       if (!input.hidden && input.value.trim() === "") {
